@@ -238,3 +238,124 @@ class TestILRawTag(unittest.TestCase):
         writer.seek(0)
         exp.seek(0)
         self.assertEqual(exp.read(), writer.read())
+
+
+class TestILFixedSizeTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILFixedSizeTag(0, 0)
+        self.assertEquals(0, t.id)
+        self.assertEquals(0, t.value_size())
+
+        t = ILFixedSizeTag(16, 12)
+        self.assertEquals(16, t.id)
+        self.assertEquals(12, t.value_size())
+
+
+class TestILBaseIntTag(unittest.TestCase):
+
+    def constructor_test_core(self, value_size: int):
+        bits = value_size * 8
+        for v in [0, 2**bits - 1]:
+            t = ILBaseIntTag(12, value_size, False, v)
+            self.assertEqual(12, t.id)
+            self.assertEqual(value_size, t.value_size())
+            self.assertEqual(v, t.value)
+            self.assertFalse(t.signed)
+        self.assertRaises(ValueError, ILBaseIntTag, 0, value_size, False, -1)
+        self.assertRaises(ValueError, ILBaseIntTag, 0,
+                          value_size, False, 2**bits)
+        bits -= 1
+        for v in [-(2**bits), (2**bits) - 1]:
+            t = ILBaseIntTag(13, value_size, True, v)
+            self.assertEqual(13, t.id)
+            self.assertEqual(value_size, t.value_size())
+            self.assertEqual(v, t.value)
+            self.assertTrue(t.signed)
+        self.assertRaises(ValueError, ILBaseIntTag, 0,
+                          value_size, True, -(2**bits + 1))
+        self.assertRaises(ValueError, ILBaseIntTag, 0,
+                          value_size, True, 2**bits)
+
+    def test_constructor(self):
+        self.constructor_test_core(1)
+        self.constructor_test_core(2)
+        self.constructor_test_core(4)
+        self.constructor_test_core(8)
+        for value_size in [0, 3, 5, 6, 7, 9]:
+            self.assertRaises(ValueError, ILBaseIntTag, 0,
+                              value_size, False, 0)
+            self.assertRaises(ValueError, ILBaseIntTag, 0,
+                              value_size, True, 0)
+
+    def value_core(self, value_size: int):
+        bits = value_size * 8
+        for v in [0, 2**bits - 1]:
+            t = ILBaseIntTag(12, value_size, False, 0)
+            t.value = v
+            self.assertEqual(v, t.value)
+        for v in [-1, 2**bits]:
+            t = ILBaseIntTag(12, value_size, False, 0)
+            with self.assertRaises(ValueError):
+                t.value = v
+        bits -= 1
+        for v in [-(2**bits), (2**bits) - 1]:
+            t = ILBaseIntTag(12, value_size, True, 0)
+            t.value = v
+            self.assertEqual(v, t.value)
+        for v in [-(2 ** bits + 1), 2**bits]:
+            t = ILBaseIntTag(12, value_size, True, 0)
+            with self.assertRaises(ValueError):
+                t.value = v
+
+    def test_value(self):
+        self.value_core(1)
+        self.value_core(2)
+        self.value_core(4)
+        self.value_core(8)
+
+    def deserialize_value_core(self, value_size: int, signed: bool):
+        sample = b'FEDCBA9876543210'
+
+        t = ILBaseIntTag(0, value_size, signed, 0)
+        reader = io.BytesIO(sample[:value_size])
+        t.deserialize_value(None, value_size, reader)
+        exp = int.from_bytes(sample[:value_size],
+                             byteorder='big', signed=signed)
+        self.assertEqual(exp, t.value)
+        self.assertRaises(EOFError, t.deserialize_value,
+                          None, value_size, reader)
+        self.assertRaises(EOFError, t.deserialize_value,
+                          None, value_size - 1, reader)
+
+    def test_deserialize_value(self):
+        self.deserialize_value_core(1, False)
+        self.deserialize_value_core(1, True)
+        self.deserialize_value_core(2, False)
+        self.deserialize_value_core(2, True)
+        self.deserialize_value_core(4, False)
+        self.deserialize_value_core(4, True)
+        self.deserialize_value_core(8, False)
+        self.deserialize_value_core(8, True)
+
+    def serialize_value_core(self, value_size: int, signed: bool):
+        sample = b'FEDCBA9876543210'
+
+        val = int.from_bytes(sample[:value_size],
+                             byteorder='big', signed=signed)
+        t = ILBaseIntTag(0, value_size, signed, val)
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(value_size, writer.tell())
+        writer.seek(0)
+        self.assertEqual(sample[:value_size], writer.read())
+
+    def test_serialize_value(self):
+        self.serialize_value_core(1, False)
+        self.serialize_value_core(1, True)
+        self.serialize_value_core(2, False)
+        self.serialize_value_core(2, True)
+        self.serialize_value_core(4, False)
+        self.serialize_value_core(4, True)
+        self.serialize_value_core(8, False)
+        self.serialize_value_core(8, True)

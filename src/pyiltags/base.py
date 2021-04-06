@@ -254,6 +254,8 @@ class ILBaseIntTag(ILFixedSizeTag):
         if value_size not in [1, 2, 4, 8]:
             raise ValueError('value_size must be 1, 2, 4 or 8.')
         self.signed = signed
+        #assert_int_bounds(value, value_size, signed)
+        #self._value = value
         self.value = value
 
     @property
@@ -264,17 +266,20 @@ class ILBaseIntTag(ILFixedSizeTag):
         return self._value
 
     @value.setter
-    def set_value(self, value: int) -> None:
+    def value(self, value: int):
         """
         Sets the integer value. It may raise a `ValueError` if the
         value is outside of the range of the integer defined in the constructor.
         """
         if not isinstance(value, int):
             raise TypeError('value must be a int.')
-        assert_int_bounds(value, self.value_size, self.signed)
+        assert_int_bounds(value, self.value_size(), self.signed)
         self._value = value
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if self.value_size() > tag_size:
+            raise EOFError(
+                f'At least {self.tag_size()} are required to deserialize this tag.')
         self.value = read_int(self.value_size(), self.signed, reader)
 
     def serialize_value(self, writer: io.IOBase) -> None:
@@ -318,6 +323,9 @@ class ILBaseFloatTag(ILFixedSizeTag):
         self._value = value
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if self.value_size() > tag_size:
+            raise EOFError(
+                f'At least {self.tag_size()} are required to deserialize this tag.')
         if self.value_size() == 4:
             self.value = read_binary32(reader)
         else:
