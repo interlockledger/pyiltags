@@ -291,7 +291,7 @@ class ILBaseFloatTag(ILFixedSizeTag):
     This class implements the base class for floating point tags with 32 and 64 bits.
     """
 
-    def __init__(self, id: int, value_size: int, value: float) -> None:
+    def __init__(self, id: int, value_size: int, value: float = 0.0) -> None:
         """
         Creates new instance of this class.
 
@@ -303,7 +303,7 @@ class ILBaseFloatTag(ILFixedSizeTag):
         super().__init__(id, value_size)
         if value_size not in [4, 8]:
             raise ValueError('value_size must be 4 or 8.')
-        self._value_size = value_size
+        self.value = value
 
     @property
     def value(self) -> float:
@@ -313,13 +313,14 @@ class ILBaseFloatTag(ILFixedSizeTag):
         return self._value
 
     @value.setter
-    def set_value(self, value: float) -> None:
+    def value(self, value: float) -> None:
         """
         Sets the value of the tag.
         """
-        if not isinstance(value, float):
-            raise TypeError('value must be a float.')
-        assert_int_bounds(value, self.value_size, self.signed)
+        if isinstance(value, int):
+            value = float(value)
+        elif not isinstance(value, float):
+            raise TypeError('value must be a float or an integer.')
         self._value = value
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:

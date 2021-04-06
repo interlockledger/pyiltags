@@ -359,3 +359,87 @@ class TestILBaseIntTag(unittest.TestCase):
         self.serialize_value_core(4, True)
         self.serialize_value_core(8, False)
         self.serialize_value_core(8, True)
+
+
+class TestILBaseFloatTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILBaseFloatTag(1, 4)
+        self.assertEqual(1, t.id)
+        self.assertEqual(4, t.value_size())
+        self.assertEqual(0, t.value)
+
+        t = ILBaseFloatTag(1, 4, 1.0)
+        self.assertEqual(1, t.id)
+        self.assertEqual(4, t.value_size())
+        self.assertEqual(1.0, t.value)
+
+        t = ILBaseFloatTag(1, 8)
+        self.assertEqual(1, t.id)
+        self.assertEqual(8, t.value_size())
+        self.assertEqual(0, t.value)
+
+        t = ILBaseFloatTag(1, 8, 1.0)
+        self.assertEqual(1, t.id)
+        self.assertEqual(8, t.value_size())
+        self.assertEqual(1.0, t.value)
+
+        self.assertRaises(ValueError, ILBaseFloatTag, 1, 3, 0.0)
+        self.assertRaises(ValueError, ILBaseFloatTag, 1, 5, 0.0)
+        self.assertRaises(ValueError, ILBaseFloatTag, 1, 7, 0.0)
+        self.assertRaises(ValueError, ILBaseFloatTag, 1, 9, 0.0)
+
+    def test_value(self):
+        t = ILBaseFloatTag(1, 4)
+        self.assertEqual(0, t.value)
+        self.assertTrue(isinstance(t.value, float))
+        t.value = 1
+        self.assertEqual(1.0, t.value)
+        self.assertTrue(isinstance(t.value, float))
+
+        t = ILBaseFloatTag(1, 8)
+        self.assertEqual(0, t.value)
+        self.assertTrue(isinstance(t.value, float))
+        t.value = 1
+        self.assertEqual(1.0, t.value)
+        self.assertTrue(isinstance(t.value, float))
+
+    def test_deserialize_value(self):
+        val = 3.1415927410125732
+        serialized = struct.pack('>f', val)
+        t = ILBaseFloatTag(1, 4)
+        t.deserialize_value(None, 4, io.BytesIO(serialized))
+        self.assertEqual(val, t.value)
+        self.assertRaises(EOFError, t.deserialize_value,
+                          None, 3, io.BytesIO(serialized))
+        self.assertRaises(EOFError, t.deserialize_value,
+                          None, 4, io.BytesIO(serialized[:-1]))
+
+        val = 3.141592653589793
+        serialized = struct.pack('>d', val)
+        t = ILBaseFloatTag(1, 8)
+        t.deserialize_value(None, 8, io.BytesIO(serialized))
+        self.assertEqual(val, t.value)
+        self.assertRaises(EOFError, t.deserialize_value,
+                          None, 7, io.BytesIO(serialized))
+        self.assertRaises(EOFError, t.deserialize_value,
+                          None, 8, io.BytesIO(serialized[:-1]))
+
+    def test_serialize_value(self):
+        val = 3.1415927410125732
+        serialized = struct.pack('>f', val)
+        t = ILBaseFloatTag(1, 4, val)
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(4, writer.tell())
+        writer.seek(0)
+        self.assertEqual(serialized, writer.read())
+
+        val = 3.141592653589793
+        serialized = struct.pack('>d', val)
+        t = ILBaseFloatTag(1, 8, val)
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(8, writer.tell())
+        writer.seek(0)
+        self.assertEqual(serialized, writer.read())
