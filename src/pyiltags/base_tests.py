@@ -168,3 +168,73 @@ class TestILTag(unittest.TestCase):
         exp.seek(0)
         writer.seek(0)
         self.assertEqual(exp.read(), writer.read())
+
+
+class TestILRawTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILRawTag(16)
+        self.assertIsNone(t.payload)
+        self.assertEqual(0, t.value_size())
+
+        t = ILRawTag(456, b'')
+        self.assertEqual(b'', t.payload)
+        self.assertEqual(0, t.value_size())
+
+        t = ILRawTag(456, b'1234')
+        self.assertEqual(b'1234', t.payload)
+        self.assertEqual(4, t.value_size())
+
+        self.assertRaises(ValueError, ILRawTag, 15, None)
+        self.assertRaises(ValueError, ILRawTag, 0, b'1234')
+
+    def test_deserialize_value(self):
+        t = ILRawTag(16)
+        reader = io.BytesIO(b'1234')
+        t.deserialize_value(None, 0, reader)
+        self.assertEqual(0, reader.tell())
+        self.assertEqual(b'', t.payload)
+        self.assertEqual(0, t.value_size())
+
+        t = ILRawTag(16)
+        reader = io.BytesIO(b'1234')
+        t.deserialize_value(None, 3, reader)
+        self.assertEqual(3, reader.tell())
+        self.assertEqual(b'123', t.payload)
+        self.assertEqual(3, t.value_size())
+
+        t = ILRawTag(16)
+        reader = io.BytesIO(b'1234')
+        self.assertRaises(EOFError, t.deserialize_value, None, 5, reader)
+
+    def test_serialize(self):
+        t = ILRawTag(16)
+        writer = io.BytesIO()
+        t.serialize(writer)
+        exp = io.BytesIO()
+        ilint_encode_to_stream(16, exp)
+        ilint_encode_to_stream(0, exp)
+        writer.seek(0)
+        exp.seek(0)
+        self.assertEqual(exp.read(), writer.read())
+
+        t = ILRawTag(256, b'')
+        writer = io.BytesIO()
+        t.serialize(writer)
+        exp = io.BytesIO()
+        ilint_encode_to_stream(256, exp)
+        ilint_encode_to_stream(0, exp)
+        writer.seek(0)
+        exp.seek(0)
+        self.assertEqual(exp.read(), writer.read())
+
+        t = ILRawTag(12312312, b'0123456789')
+        writer = io.BytesIO()
+        t.serialize(writer)
+        exp = io.BytesIO()
+        ilint_encode_to_stream(12312312, exp)
+        ilint_encode_to_stream(10, exp)
+        exp.write(b'0123456789')
+        writer.seek(0)
+        exp.seek(0)
+        self.assertEqual(exp.read(), writer.read())
