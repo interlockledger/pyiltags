@@ -28,7 +28,8 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+import pyilint
+import codecs
 from .base import *
 
 # Standard tag IDs
@@ -60,9 +61,238 @@ ILTAG_DICT_ID = 30
 ILTAG_STRDICT_ID = 31
 
 
-class ILNullTag(ILTag):
+class ILNullTag(ILFixedSizeTag):
     """
     This class implements the standard tag ILTAG_NULL.
     """
-    def __init__() -> None:
-        super().__init__(ILTAG_NULL_ID)
+
+    def __init__(self, id: int = ILTAG_NULL_ID) -> None:
+        super().__init__(ILTAG_NULL_ID, 0)
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        pass
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        pass
+
+
+class ILBoolTag(ILFixedSizeTag):
+    """
+    This class implements the standard tag ILTAG_NULL.
+    """
+
+    def __init__(self, value: bool = False, id: int = ILTAG_BOOL_ID) -> None:
+        super().__init__(id, 1)
+        self.value = value
+
+    @property
+    def value(self) -> bool:
+        return self._value
+
+    @value.setter
+    def value(self, value: bool) -> bool:
+        self._value = bool(value)
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < 1:
+            raise EOFError('Unable to read the value of the tag.')
+        v = read_bytes(1, reader)
+        if v[0] == 0:
+            self.value = False
+        if v[0] == 1:
+            self.value = True
+        else:
+            raise ILTagCorruptedError('Invalid boolean value.')
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        if self.value:
+            writer.write(b'\x01')
+        else:
+            writer.write(b'\x00')
+
+
+class ILInt8Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_INT8_ID) -> None:
+        super().__init__(id, 1, True, value)
+
+
+class ILUInt8Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_UINT8_ID) -> None:
+        super().__init__(id, 1, False, value)
+
+
+class ILInt16Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_INT16_ID) -> None:
+        super().__init__(id, 2, True, value)
+
+
+class ILUInt16Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_UINT16_ID) -> None:
+        super().__init__(id, 2, False, value)
+
+
+class ILInt32Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_INT32_ID) -> None:
+        super().__init__(id, 4, True, value)
+
+
+class ILUInt32Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_UINT32_ID) -> None:
+        super().__init__(id, 4, False, value)
+
+
+class ILInt64Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_INT64_ID) -> None:
+        super().__init__(id, 8, True, value)
+
+
+class ILUInt64Tag(ILBaseIntTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_UINT64_ID) -> None:
+        super().__init__(id, 8, False, value)
+
+
+class ILUInt64Tag(ILTag):
+    def __init__(self, value: int = 0, id: int = ILTAG_ILINT64_ID) -> None:
+        super().__init__(id)
+        self.value = value
+
+    @property
+    def value(self) -> int:
+        return self._value
+
+    @value.setter
+    def value(self, value: int):
+        if not isinstance(value, int):
+            raise TypeError('The value must be an integer.')
+        assert_int_bounds(value, 8, False)
+        self._value = value
+
+    def value_size(self) -> int:
+        return pyilint.ilint_size(self.value)
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < 1:
+            raise EOFError('Unable to read the value of the tag.')
+        header = read_bytes(1, reader)[0]
+        size = pyilint.ilint_size_from_header(header)
+        if size > tag_size:
+            raise EOFError('Unable to read the value of the tag.')
+        self.value = pyilint.ilint_decode_multibyte_core(
+            header, size, read_bytes(size - 1, reader))
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        pyilint.ilint_encode_to_stream(self.value, writer)
+
+
+class ILBinary32Tag(ILBaseFloatTag):
+    def __init__(self, value: float = 0.0, id: int = ILTAG_BINARY32_ID) -> None:
+        super().__init__(id, 4, value=value)
+
+
+class ILBinary64Tag(ILBaseFloatTag):
+    def __init__(self, value: float = 0.0, id: int = ILTAG_BINARY64_ID) -> None:
+        super().__init__(id, 8, value=value)
+
+
+class ILBinary128Tag(ILFixedSizeTag):
+    def __init__(self, value: bytes = None, id: int = ILTAG_BINARY128_ID) -> None:
+        super().__init__(id, 16)
+        if value is None:
+            self.value = b'\x00' * 16
+        else:
+            self.value = value
+
+    @property
+    def value(self) -> bytes:
+        return self._value
+
+    @value.setter
+    def value(self, value: bytes):
+        if not isinstance(value, bytes) or len(value) != 16:
+            raise TypeError(
+                'The value must be an instance of bytes with 16 positions.')
+        self._value = value
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < 16:
+            raise EOFError('Unable to read the value of the tag.')
+        self.value = read_bytes(16, reader)
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        writer.write(self.value)
+
+
+class ILByteArrayTag(ILRawTag):
+    def __init__(self, payload: bytes = None, id: int = ILTAG_BYTE_ARRAY_ID) -> None:
+        super().__init__(id, payload)
+
+
+class ILStringTag(ILTag):
+    def __init__(self, value: str = None, id: int = ILTAG_STRING_ID) -> None:
+        super().__init__(id)
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @value.setter
+    def value(self, value: str):
+        if not isinstance(value, str):
+            raise TypeError('The value must be a str.')
+        self._value = value
+        self._utf8 = codecs.encode(value, 'utf-8')
+
+    def value_size(self) -> int:
+        return len(self._utf8)
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        self._utf8 = read_bytes(tag_size, reader)
+        try:
+            self._value = codecs.decode(self._utf8, 'utf-8')
+        except ValueError:
+            raise ILTagCorruptedError('Corrupted string tag.')
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        writer.write(self._utf8)
+
+
+class ILBigIntegerTag(ILRawTag):
+    def __init__(self, value: bytes = None, id: int = ILTAG_BINT_ID) -> None:
+        super().__init__(id, value)
+
+
+class ILBigDecimalTag(ILTag):
+    def __init__(self, value: bytes = None, scale: int = 0, id: int = ILTAG_BDEC_ID) -> None:
+        super().__init__(id)
+        self.scale = scale
+        self.value = value
+
+    @property
+    def value(self) -> bytes:
+        return self._value
+
+    @value.setter
+    def value(self, value: bytes):
+        if not isinstance(value, bytes):
+            raise TypeError('Value must be an instance of bytes.')
+        self._value = value
+
+    @property
+    def scale(self) -> int:
+        return self._scale
+
+    @scale.setter
+    def scale(self, scale: int):
+        assert_int_bounds(scale, 4, True)
+        self._scale = scale
+
+    def value_size(self) -> int:
+        return 4 + len(self.value)
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        self.scale = read_int(4, True, reader)
+        self.value = read_bytes(tag_size - 4, reader)
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        write_int(self.scale, 4, True, writer)
+        writer.write(self.value)
