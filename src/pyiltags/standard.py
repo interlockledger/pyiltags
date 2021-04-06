@@ -98,7 +98,7 @@ class ILNullTag(ILFixedSizeTag):
 
 class ILBoolTag(ILFixedSizeTag):
     """
-    This class implements the standard tag ILTAG_NULL.
+    This class implements the standard tag ILTAG_BOOL.
     """
 
     def __init__(self, value: bool = False, id: int = ILTAG_BOOL_ID) -> None:
