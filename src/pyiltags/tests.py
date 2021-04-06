@@ -30,3 +30,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from .io_tests import *
 from .util_tests import *
+from .base_tests import *
+from .standard_tests import *

@@ -45,13 +45,22 @@ class ILTagStateError(ILTagError):
         super().__init__(*args)
 
 
-def iltags_is_implicity(id: int) -> bool:
+def iltags_assert_valid_id(id: int) -> None:
+    """
+    Asserts that the id is a valid ILTag id. Raises
+    `ValueError` if the id is invalid.
+    """
+    assert_int_bounds(id, 8, False)
+
+
+def iltags_is_implicit(id: int) -> bool:
     """
     Verifies if the given tag id represents an implicity tag.
 
     Parameters:
     - `id`: The tag id to be tested.
     """
+    iltags_assert_valid_id(id)
     return id < 16
 
 
@@ -62,6 +71,7 @@ def iltags_is_standard(id: int) -> bool:
     Parameters:
     - `id`: The tag id to be tested.
     """
+    iltags_assert_valid_id(id)
     return id < 32
 
 
@@ -80,15 +90,15 @@ class ILTagFactory:
         """
         Creates the appropriate instance of the tags
         """
-        raise NotImplemented('Subclasses must override this method.')
+        raise NotImplementedError('Subclasses must override this method.')
 
     def deserialize(self, reader: io.IOBase) -> 'ILTag':
-        raise NotImplemented('Subclasses must override this method.')
+        raise NotImplementedError('Subclasses must override this method.')
 
 
 class ILTag:
     def __init__(self, id: int) -> None:
-        pyilint.assert_uint64_bounds(id)
+        iltags_assert_valid_id(id)
         self._id = id
 
     @property
@@ -103,7 +113,7 @@ class ILTag:
         """
         Returns True if this tag is implicity.
         """
-        return iltags_is_implicity(self.id)
+        return iltags_is_implicit(self.id)
 
     @property
     def standard(self) -> bool:
