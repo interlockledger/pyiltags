@@ -201,10 +201,14 @@ class ILILInt64Tag(ILTag):
             raise EOFError('Unable to read the value of the tag.')
         header = read_bytes(1, reader)[0]
         size = pyilint.ilint_size_from_header(header)
-        if size > tag_size:
-            raise EOFError('Unable to read the value of the tag.')
-        self.value = pyilint.ilint_decode_multibyte_core(
-            header, size, read_bytes(size - 1, reader))
+        if size == 1:
+            val = header
+        else:
+            if size > tag_size:
+                raise EOFError('Unable to read the value of the tag.')
+            val, size = pyilint.ilint_decode_multibyte_core(
+                header, size, read_bytes(size - 1, reader))
+        self.value = val
 
     def serialize_value(self, writer: io.IOBase) -> None:
         pyilint.ilint_encode_to_stream(self.value, writer)

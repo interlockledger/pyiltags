@@ -190,3 +190,77 @@ class BaseTestILIntTag(unittest.TestCase):
         self.constructor_core(ILUInt32Tag, 4, ILTAG_UINT32_ID, False)
         self.constructor_core(ILInt64Tag, 8, ILTAG_INT64_ID, True)
         self.constructor_core(ILUInt64Tag, 8, ILTAG_UINT64_ID, False)
+
+
+class TestILILInt64Tag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILILInt64Tag()
+        self.assertEqual(ILTAG_ILINT64_ID, t.id)
+        self.assertEqual(0, t.value)
+
+        t = ILILInt64Tag(123)
+        self.assertEqual(ILTAG_ILINT64_ID, t.id)
+        self.assertEqual(123, t.value)
+
+        t = ILILInt64Tag(123, 456)
+        self.assertEqual(456, t.id)
+        self.assertEqual(123, t.value)
+
+        self.assertRaises(ValueError, ILILInt64Tag, -1)
+        self.assertRaises(ValueError, ILILInt64Tag, 2**64)
+        self.assertRaises(TypeError, ILILInt64Tag, '1')
+        self.assertRaises(TypeError, ILILInt64Tag, 1.0)
+
+    def test_value(self):
+        t = ILILInt64Tag()
+
+        t.value = 0
+        self.assertEqual(0, t.value)
+
+        t.value = 2**64 - 1
+        self.assertEqual(2**64 - 1, t.value)
+
+        for v in ['', '1', b'123', 1.0]:
+            with self.assertRaises(TypeError):
+                t.value = v
+        for v in [-1, 2**64]:
+            with self.assertRaises(ValueError):
+                t.value = v
+
+    def test_value_size(self):
+
+        for v in [0, 0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+                  0xFFFFFFFFFF, 0xFFFFFFFFFFFF,
+                  0xFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF]:
+            t = ILILInt64Tag(v)
+            self.assertEqual(pyilint.ilint_size(t.value), t.value_size())
+
+    def test_deserialize_value(self):
+
+        for v in [0, 0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+                  0xFFFFFFFFFF, 0xFFFFFFFFFFFF,
+                  0xFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF]:
+            t = ILILInt64Tag(v)
+            val = bytearray()
+            size = pyilint.ilint_encode(v, val)
+            reader = io.BytesIO(val)
+            t.deserialize_value(None, size, reader)
+            self.assertEqual(size, reader.tell())
+            self.assertEqual(v, t.value)
+
+    def test_serialize_value(self):
+
+        for v in [0, 0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+                  0xFFFFFFFFFF, 0xFFFFFFFFFFFF,
+                  0xFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF]:
+            t = ILILInt64Tag(v)
+
+            val = bytearray()
+            size = pyilint.ilint_encode(v, val)
+
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(size, writer.tell())
+            writer.seek(0)
+            self.assertEqual(val, writer.read())
