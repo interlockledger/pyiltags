@@ -110,16 +110,22 @@ class ILBoolTag(ILFixedSizeTag):
         return self._value
 
     @value.setter
-    def value(self, value: bool) -> bool:
+    def value(self, value: any) -> bool:
+        """
+        Sets the value of this tag. The final value will assume the result
+        of `bool(value)`.
+        """
         self._value = bool(value)
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < 1:
             raise EOFError('Unable to read the value of the tag.')
+        if tag_size > 1:
+            raise ILTagCorruptedError('Invalid boolean tag size.')
         v = read_bytes(1, reader)
         if v[0] == 0:
             self.value = False
-        if v[0] == 1:
+        elif v[0] == 1:
             self.value = True
         else:
             raise ILTagCorruptedError('Invalid boolean value.')
@@ -171,7 +177,7 @@ class ILUInt64Tag(ILBaseIntTag):
         super().__init__(id, 8, False, value)
 
 
-class ILUInt64Tag(ILTag):
+class ILILInt64Tag(ILTag):
     def __init__(self, value: int = 0, id: int = ILTAG_ILINT64_ID) -> None:
         super().__init__(id)
         self.value = value

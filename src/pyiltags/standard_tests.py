@@ -28,6 +28,7 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from typing import Callable
 import unittest
 from .standard import *
 
@@ -87,3 +88,105 @@ class TestILNullTag(unittest.TestCase):
         writer = io.BytesIO()
         t.serialize_value(writer)
         self.assertEqual(0, writer.tell())
+
+
+class TestILBoolTag(unittest.TestCase):
+
+    def test_contructor(self):
+        t = ILBoolTag()
+        self.assertEqual(ILTAG_BOOL_ID, t.id)
+        self.assertEqual(1, t.value_size())
+        self.assertFalse(t.value)
+
+        t = ILBoolTag(False)
+        self.assertEqual(ILTAG_BOOL_ID, t.id)
+        self.assertEqual(1, t.value_size())
+        self.assertFalse(t.value)
+
+        t = ILBoolTag(True)
+        self.assertEqual(ILTAG_BOOL_ID, t.id)
+        self.assertEqual(1, t.value_size())
+        self.assertTrue(t.value)
+
+        t = ILBoolTag(False, 123123)
+        self.assertEqual(123123, t.id)
+        self.assertEqual(1, t.value_size())
+        self.assertFalse(t.value)
+
+        t = ILBoolTag(True, 123123)
+        self.assertEqual(123123, t.id)
+        self.assertEqual(1, t.value_size())
+        self.assertTrue(t.value)
+
+    def test_value(self):
+        t = ILBoolTag()
+
+        for v in [False, 0, None, b'', '', []]:
+            t.value = v
+            self.assertFalse(t.value)
+        for v in [True, 1, 1.0, b'x', 'z', [1]]:
+            t.value = v
+            self.assertTrue(t.value)
+
+    def test_deserialize_value(self):
+        t = ILBoolTag(True)
+
+        t.deserialize_value(None, 1, io.BytesIO(b'\x00'))
+        self.assertFalse(t.value)
+
+        t.deserialize_value(None, 1, io.BytesIO(b'\x01'))
+        self.assertTrue(t.value)
+
+        self.assertRaises(EOFError,
+                          t.deserialize_value, None, 0, io.BytesIO(b'\x00'))
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 2, io.BytesIO(b'\x0001'))
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 1, io.BytesIO(b'\x02'))
+
+    def test_serialize_value(self):
+        t = ILBoolTag()
+
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(1, writer.tell())
+        writer.seek(0)
+        self.assertEqual(b'\x00', writer.read())
+
+        t.value = True
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(1, writer.tell())
+        writer.seek(0)
+        self.assertEqual(b'\x01', writer.read())
+
+
+class BaseTestILIntTag(unittest.TestCase):
+    def constructor_core(self, tag_class: Callable, exp_size: int, default_id: int, signed: bool):
+        t = tag_class()
+        self.assertEqual(default_id, t.id)
+        self.assertEqual(exp_size, t.value_size())
+        self.assertEqual(0, t.value)
+        self.assertEqual(signed, t.signed)
+
+        t = tag_class(123)
+        self.assertEqual(default_id, t.id)
+        self.assertEqual(exp_size, t.value_size())
+        self.assertEqual(123, t.value)
+        self.assertEqual(signed, t.signed)
+
+        t = tag_class(123, 456)
+        self.assertEqual(456, t.id)
+        self.assertEqual(exp_size, t.value_size())
+        self.assertEqual(123, t.value)
+        self.assertEqual(signed, t.signed)
+
+    def test_constructor(self):
+        self.constructor_core(ILInt8Tag, 1, ILTAG_INT8_ID, True)
+        self.constructor_core(ILUInt8Tag, 1, ILTAG_UINT8_ID, False)
+        self.constructor_core(ILInt16Tag, 2, ILTAG_INT16_ID, True)
+        self.constructor_core(ILUInt16Tag, 2, ILTAG_UINT16_ID, False)
+        self.constructor_core(ILInt32Tag, 4, ILTAG_INT32_ID, True)
+        self.constructor_core(ILUInt32Tag, 4, ILTAG_UINT32_ID, False)
+        self.constructor_core(ILInt64Tag, 8, ILTAG_INT64_ID, True)
+        self.constructor_core(ILUInt64Tag, 8, ILTAG_UINT64_ID, False)
