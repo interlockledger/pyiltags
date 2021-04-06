@@ -29,6 +29,9 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import unittest
+from unittest.mock import MagicMock
+
+from pyilint import ilint_encode_to_stream, ilint_size
 from .base import *
 
 
@@ -75,3 +78,93 @@ class TestILTagFactory(unittest.TestCase):
         self.assertFalse(c.strict)
         self.assertRaises(NotImplementedError, c.create, 10)
         self.assertRaises(NotImplementedError, c.deserialize, io.BytesIO())
+
+
+class TestILTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILTag(0)
+        self.assertEqual(t.id, 0)
+
+        t = ILTag(2**64 - 1)
+        self.assertEqual(t.id, 2**64 - 1)
+
+        self.assertRaises(ValueError, ILTag, -1)
+        self.assertRaises(ValueError, ILTag, 2**64)
+
+    def test_implicit(self):
+        for id in range(16):
+            t = ILTag(id)
+            self.assertTrue(t.implicit)
+        t = ILTag(16)
+        self.assertFalse(t.implicit)
+
+    def test_standard(self):
+        for id in range(32):
+            t = ILTag(id)
+            self.assertTrue(t.standard)
+        t = ILTag(32)
+        self.assertFalse(t.standard)
+
+    def test_value_size(self):
+        t = ILTag(0)
+        self.assertRaises(NotImplementedError, t.value_size)
+
+    def test_tag_size(self):
+        for id in range(16):
+            t = ILTag(id)
+            t.value_size = MagicMock(return_value=id)
+            size = ilint_size(id) + id
+            self.assertEqual(t.tag_size(), size)
+            t.value_size.assert_called_once()
+            self.assertEqual(len(t), size)
+
+        for id in [16, 256, 1231231]:
+            t = ILTag(id)
+            t.value_size = MagicMock(return_value=id)
+            size = ilint_size(id) + ilint_size(id) + id
+            self.assertEqual(t.tag_size(), size)
+            t.value_size.assert_called_once()
+            self.assertEqual(len(t), size)
+
+    def test_deserialize_value(self):
+        t = ILTag(0)
+        self.assertRaises(NotImplementedError, t.deserialize_value,
+                          ILTagFactory(), 0, io.BytesIO())
+
+    def test_serialize_value(self):
+        t = ILTag(0)
+        self.assertRaises(NotImplementedError, t.serialize_value, io.BytesIO())
+
+    def test_serialize(self):
+        class DummyILTag(ILTag):
+            def value_size(self) -> int:
+                return 4
+
+            def serialize_value(self, writer: io.IOBase) -> None:
+                writer.write(b'1234')
+
+        # Normal tag with no payload
+        t = DummyILTag(65535)
+        writer = io.BytesIO()
+        t.serialize(writer)
+
+        exp = io.BytesIO()
+        ilint_encode_to_stream(65535, exp)
+        ilint_encode_to_stream(4, exp)
+        exp.write(b'1234')
+        exp.seek(0)
+        writer.seek(0)
+        self.assertEqual(exp.read(), writer.read())
+
+        # Implicit
+        t = DummyILTag(1)
+        writer = io.BytesIO()
+        t.serialize(writer)
+
+        exp = io.BytesIO()
+        ilint_encode_to_stream(1, exp)
+        exp.write(b'1234')
+        exp.seek(0)
+        writer.seek(0)
+        self.assertEqual(exp.read(), writer.read())

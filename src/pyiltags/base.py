@@ -109,9 +109,9 @@ class ILTag:
         return self._id
 
     @property
-    def implicity(self) -> bool:
+    def implicit(self) -> bool:
         """
-        Returns True if this tag is implicity.
+        Returns True if this tag is implicit.
         """
         return iltags_is_implicit(self.id)
 
@@ -125,10 +125,8 @@ class ILTag:
     def value_size(self) -> int:
         """
         Returns the size of the payload in bytes. It must be overridden by subclasses.
-
-        The default implementation always returns 0.
         """
-        return 0
+        raise NotImplementedError('Subclasses must override this method.')
 
     def tag_size(self) -> int:
         """
@@ -136,7 +134,7 @@ class ILTag:
         """
         value_size = self.value_size()
         size = pyilint.ilint_size(self.id) + value_size
-        if not self.implicity:
+        if not self.implicit:
             size += pyilint.ilint_size(value_size)
         return size
 
@@ -155,10 +153,8 @@ class ILTag:
         - `tag_factory`: The current tag factory;
         - `tag_size`: The size of the payload;
         - `reader`: The reader;
-
-        The default implementation does nothing.
         """
-        pass
+        raise NotImplementedError('Subclasses must override this method.')
 
     def serialize_value(self, writer: io.IOBase) -> None:
         """
@@ -166,10 +162,8 @@ class ILTag:
 
         Parameters:
         - `writer`: The writer;
-
-        The default implementation aways does nothing.
         """
-        pass
+        raise NotImplementedError('Subclasses must override this method.')
 
     def serialize(self, writer: io.IOBase) -> None:
         """
@@ -179,7 +173,7 @@ class ILTag:
         - `writer`: The writer;
         """
         pyilint.ilint_encode_to_stream(self.id, writer)
-        if not self.implicity:
+        if not self.implicit:
             pyilint.ilint_encode_to_stream(self.value_size(), writer)
         self.serialize_value(writer)
 
@@ -199,7 +193,7 @@ class ILRawTag(ILTag):
         - `payload`: The payload in bytes. None is equivalent to b''.
         """
         super().__init__(id)
-        if self.implicity:
+        if self.implicit:
             raise ValueError('Implicity tags cannot be by this class.')
         self.payload = payload
 
