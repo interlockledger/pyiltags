@@ -60,6 +60,25 @@ ILTAG_OID_ID = 25
 ILTAG_DICT_ID = 30
 ILTAG_STRDICT_ID = 31
 
+ILTAG_STANDARD_SIZES = [
+    0,  # TAG_NULL
+    1,  # TAG_BOOL
+    1,  # TAG_INT8
+    1,  # TAG_UINT8
+    2,  # TAG_INT16
+    2,  # TAG_UINT16
+    4,  # TAG_INT32
+    4,  # TAG_UINT32
+    8,  # TAG_INT64
+    8,  # TAG_UINT64
+    -1,  # TAG_ILINT64 - Not defined in this table
+    4,  # TAG_BINARY32
+    8,  # TAG_BINARY64
+    16,  # TAG_BINARY128
+    -1,  # Reserved
+    -1  # Reserved
+]
+
 
 class ILNullTag(ILFixedSizeTag):
     """
