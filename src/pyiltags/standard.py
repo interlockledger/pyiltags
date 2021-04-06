@@ -67,10 +67,11 @@ class ILNullTag(ILFixedSizeTag):
     """
 
     def __init__(self, id: int = ILTAG_NULL_ID) -> None:
-        super().__init__(ILTAG_NULL_ID, 0)
+        super().__init__(id, 0)
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        pass
+        if tag_size != 0:
+            raise ILTagCorruptedError('Corrupted null tag.')
 
     def serialize_value(self, writer: io.IOBase) -> None:
         pass

@@ -61,3 +61,29 @@ class TestILTagIds(unittest.TestCase):
         self.assertEqual(ILTAG_OID_ID, 25)
         self.assertEqual(ILTAG_DICT_ID, 30)
         self.assertEqual(ILTAG_STRDICT_ID, 31)
+
+
+class TestILNullTag(unittest.TestCase):
+
+    def test_contructor(self):
+        t = ILNullTag()
+        self.assertEqual(ILTAG_NULL_ID, t.id)
+        self.assertEqual(0, t.value_size())
+
+        t = ILNullTag(123)
+        self.assertEqual(123, t.id)
+        self.assertEqual(0, t.value_size())
+
+    def test_deserialize_value(self):
+        t = ILNullTag()
+        reader = io.BytesIO(b'123456')
+        t.deserialize_value(None, 0, reader)
+        self.assertEqual(0, reader.tell())
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 1, reader)
+
+    def test_serialize_value(self):
+        t = ILNullTag()
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(0, writer.tell())
