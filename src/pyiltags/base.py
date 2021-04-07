@@ -29,6 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from typing import ForwardRef
+import sys
 import io
 import pyilint
 from .io import *
@@ -197,6 +198,7 @@ class ILRawTag(ILTag):
     This class implements a raw `ILTag`. It can be used as an opaque
     implementation for any explicit tag.
     """
+    DEFAULT_VALUE = None
 
     def __init__(self, id: int, value: bytes = None) -> None:
         """
@@ -204,10 +206,28 @@ class ILRawTag(ILTag):
 
         Parameters:
         - `id`: The tag id. It must be an explicit tag ID;
-        - `value`: The value of the tag as bytes. None is equivalent to b''.
+        - `value`: The value of the tag as bytes. None is equivalent to `self.default_value`.
         """
         super().__init__(id, False)
         self.value = value
+
+    @property
+    def default_value(self) -> bytes:
+        """
+        Returns the default value to be used when setting `value` to None.
+
+        To change the behavior of this property, set the class attribute `DEFAULT_VALUE` to
+        the specified value. It must be an instance of bytes.
+        """
+        return self.__class__.DEFAULT_VALUE
+
+    def assert_value_valid(self, value: bytes):
+        """
+        This method is called before setting the value. It must raise ValueError if the
+        value is not acceptable somehow. This method does nothing by default and may
+        be overriden to ensure a distinct behavior. 
+        """
+        pass
 
     @property
     def value(self) -> bytes:
@@ -216,13 +236,16 @@ class ILRawTag(ILTag):
     @value.setter
     def value(self, value: bytes):
         if value is None:
-            self._value = None
-        elif isinstance(value, bytearray):
-            self._value = bytes(value)
-        elif isinstance(value, bytes):
-            self._value = value
+            self._value = self.default_value
         else:
-            raise TypeError('The payload must ')
+            if isinstance(value, bytearray):
+                v = bytes(value)
+            elif isinstance(value, bytes):
+                v = value
+            else:
+                raise TypeError('The payload must ')
+            self.assert_value_valid(v)
+            self._value = v
 
     def value_size(self) -> int:
         if self.value is not None:

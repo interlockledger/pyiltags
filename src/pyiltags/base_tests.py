@@ -29,6 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import unittest
+from unittest import mock
 from unittest.mock import MagicMock
 
 from pyilint import ilint_encode_to_stream, ilint_size
@@ -176,22 +177,6 @@ class TestILRawTag(unittest.TestCase):
 
     def test_constructor(self):
         t = ILRawTag(16)
-        self.assertIsNone(t.payload)
-        self.assertEqual(0, t.value_size())
-
-        t = ILRawTag(456, b'')
-        self.assertEqual(b'', t.payload)
-        self.assertEqual(0, t.value_size())
-
-        t = ILRawTag(456, b'1234')
-        self.assertEqual(b'1234', t.payload)
-        self.assertEqual(4, t.value_size())
-
-        self.assertRaises(ValueError, ILRawTag, 15, None)
-        self.assertRaises(ValueError, ILRawTag, 0, b'1234')
-
-    def test_constructor(self):
-        t = ILRawTag(16)
 
         t.value = b'1234'
         self.assertEqual(b'1234', t.value)
@@ -202,9 +187,62 @@ class TestILRawTag(unittest.TestCase):
         t.value = None
         self.assertIsNone(t.value)
 
-        for v in ['', '1234', 1, 1.0, []]:
+        for v in ['', '1234', 1, 15, 1.0, []]:
             with self.assertRaises(TypeError):
                 t.value = v
+
+    def test_default_value(self):
+        class ILRawTagNewDefault(ILRawTag):
+            DEFAULT_VALUE = b''
+
+        t = ILRawTag(16)
+        self.assertEqual(None, t.default_value)
+
+        t = ILRawTagNewDefault(16)
+        self.assertEqual(b'', t.default_value)
+
+    def test_assert_value_valid(self):
+        t = ILRawTag(16)
+
+        t.assert_value_valid(b'')
+
+    def test_value(self):
+        class ILRawTagNewDefault(ILRawTag):
+            DEFAULT_VALUE = b''
+
+        t = ILRawTag(16, b'1234')
+
+        self.assertEqual(b'1234', t.value)
+        self.assertFalse(isinstance(t.value, bytearray))
+        self.assertTrue(isinstance(t.value, bytes))
+
+        t.value = None
+        self.assertEqual(None, t.value)
+
+        t.value = bytearray(b'5678')
+        self.assertEqual(b'5678', t.value)
+        self.assertFalse(isinstance(t.value, bytearray))
+        self.assertTrue(isinstance(t.value, bytes))
+
+        t = ILRawTagNewDefault(16)
+        t.value = None
+        self.assertEqual(b'', t.value)
+
+        t = ILRawTag(16, b'1234')
+        t.assert_value_valid = mock.MagicMock()
+        t.value = None
+        t.assert_value_valid.assert_not_called()
+        t.value = b''
+        t.assert_value_valid.assert_called()
+        t.assert_value_valid.reset_mock()
+        t.value = bytearray(b'')
+        t.assert_value_valid.assert_called()
+
+        t.value = b'1234'
+        t.assert_value_valid = mock.MagicMock(side_effect=ValueError)
+        with self.assertRaises(ValueError):
+            t.value = b''
+        self.assertEqual(b'1234', t.value)
 
     def test_deserialize_value(self):
         t = ILRawTag(16)
