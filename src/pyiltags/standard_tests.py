@@ -264,3 +264,20 @@ class TestILILInt64Tag(unittest.TestCase):
             self.assertEqual(size, writer.tell())
             writer.seek(0)
             self.assertEqual(val, writer.read())
+
+
+class TestILByteArrayTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILByteArrayTag()
+        self.assertEqual(ILTAG_BYTE_ARRAY_ID, t.id)
+        self.assertEqual(None, t.value)
+
+        paylod = b'1234'
+        t = ILByteArrayTag(paylod)
+        self.assertEqual(ILTAG_BYTE_ARRAY_ID, t.id)
+        self.assertEqual(paylod, t.value)
+
+        t = ILByteArrayTag(paylod, 1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(paylod, t.value)

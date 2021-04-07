@@ -253,8 +253,8 @@ class ILBinary128Tag(ILFixedSizeTag):
 
 
 class ILByteArrayTag(ILRawTag):
-    def __init__(self, payload: bytes = None, id: int = ILTAG_BYTE_ARRAY_ID) -> None:
-        super().__init__(id, payload)
+    def __init__(self, value: bytes = None, id: int = ILTAG_BYTE_ARRAY_ID) -> None:
+        super().__init__(id, value)
 
 
 class ILStringTag(ILTag):
