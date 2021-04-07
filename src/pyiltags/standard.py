@@ -30,6 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import pyilint
 import codecs
+from typing import Generic
 from typing import List
 from .base import *
 
@@ -444,102 +445,94 @@ class ILBigDecimalTag(ILBigIntegerTag):
         writer.write(self.value)
 
 
-class ILIntArrayTag(ILTag):
+class ILIntArrayTag(ILTag, RestrictListMixin[int]):
     """
     This class implements the tag ILTAG_ILINT64_ARRAY_ID.
     """
 
     def __init__(self, id: int = ILTAG_ILINT64_ARRAY_ID) -> None:
         super().__init__(id)
-        self._values = []
 
-    @property
-    def values(self) -> List[int]:
-        return self._values
+    def assert_value_type(self, value: T):
+        if isinstance(value, int):
+            assert_int_bounds(value, 8, False)
+        else:
+            raise TypeError('Only unsigned 64-bit integers are allowed.')
 
     def value_size(self) -> int:
-        size = pyilint.ilint_size(len(self.values))
-        for v in self.values:
+        size = pyilint.ilint_size(len(self))
+        for v in self:
             size += pyilint.ilint_size(v)
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        self.values.clear()
+        self.clear()
         if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
         count, = pyilint.ilint_decode_from_stream(reader)
         for i in range(count):
             v, = pyilint.ilint_decode_from_stream(reader)
-            self.values.append(v)
+            self.append(v)
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        for v in self.values:
-            if not isinstance(v, int):
-                raise TypeError('At least one item is not an integer.')
-            assert_int_bounds(v, 8, False)
-        pyilint.ilint_encode_to_stream(len(self.values), writer)
-        for v in self.values:
+        pyilint.ilint_encode_to_stream(len(self), writer)
+        for v in self:
             pyilint.ilint_encode_to_stream(v, writer)
 
 
-class ILTagArrayTag(ILTag):
+class ILTagArrayTag(ILTag, RestrictListMixin[ILTag]):
     """
     This class implements the tag ILTAG_ILTAG_ARRAY_ID.
     """
 
     def __init__(self, id: int = ILTAG_ILTAG_ARRAY_ID) -> None:
         super().__init__(id)
-        self._values = []
 
-    @property
-    def values(self) -> List[ILTag]:
-        return self._values
+    def assert_value_type(self, value: T):
+        if not isinstance(value, ILTag):
+            raise TypeError('Only ILTags are allowed.')
 
     def value_size(self) -> int:
-        size = pyilint.ilint_size(len(self.values))
-        for t in self.values:
+        size = pyilint.ilint_size(len(self))
+        for t in self:
             size += t.tag_size()
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        self.clear()
         if tag_size < (1 + 1):
             raise ILTagCorruptedError('Corrupted tag.')
         count, = pyilint.ilint_decode_from_stream(reader)
-        self.values.clear()
         for i in range(count):
             t = tag_factory.deserialize(reader)
-            self.values.append(t)
+            self.append(t)
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        for t in self.values:
-            if not isinstance(t, ILTag):
-                raise TypeError('At least one item is not an ILTag.')
-        pyilint.ilint_encode_to_stream(len(self.values), writer)
-        for t in self.values:
+        pyilint.ilint_encode_to_stream(len(self), writer)
+        for t in self:
             t.serialize(writer)
 
 
-class ILTagSequenceTag(ILTag):
+class ILTagSequenceTag(ILTag, RestrictListMixin[ILTag]):
     """
     This class implements the tag ILTAG_ILTAG_SEQ_ID.
     """
 
     def __init__(self, id: int = ILTAG_ILTAG_SEQ_ID) -> None:
         super().__init__(id)
-        self._values = []
 
-    @property
-    def values(self) -> List[ILTag]:
-        return self._values
+    def assert_value_type(self, value: T):
+        if not isinstance(value, ILTag):
+            raise TypeError('Only ILTags are allowed.')
 
     def value_size(self) -> int:
         size = 0
-        for t in self.values:
+        for t in self:
             size += t.tag_size()
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        self.values.clear()
+        self.clear()
         if tag_size > 0:
             r = io.BytesIO(read_bytes(tag_size))
             while r.tell() < tag_size:
@@ -547,10 +540,7 @@ class ILTagSequenceTag(ILTag):
                 self.values.append(t)
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        for t in self.values:
-            if not isinstance(t, ILTag):
-                raise TypeError('At least one item is not an ILTag.')
-        for t in self.values:
+        for t in self:
             t.serialize(writer)
 
 
