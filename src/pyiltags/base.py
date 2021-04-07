@@ -102,9 +102,18 @@ class ILTagFactory:
 
 
 class ILTag:
-    def __init__(self, id: int) -> None:
+    def __init__(self, id: int, allow_implicit=False) -> None:
+        """
+        Creates a new instance of this class.
+
+        Parameters:
+        - `id`: The tag id;
+        - `allow_implicit`: If True, allows the id to refer to an implicit tag.
+        """
         iltags_assert_valid_id(id)
         self._id = id
+        if not allow_implicit and self.implicit:
+            raise ValueError('Implicit tag is not allowed.')
 
     @property
     def id(self) -> int:
@@ -195,11 +204,9 @@ class ILRawTag(ILTag):
 
         Parameters:
         - `id`: The tag id. It must be an explicit tag ID;
-        - `payload`: The payload in bytes. None is equivalent to b''.
+        - `value`: The value of the tag as bytes. None is equivalent to b''.
         """
-        super().__init__(id)
-        if self.implicit:
-            raise ValueError('Implicity tags cannot be by this class.')
+        super().__init__(id, False)
         self.value = value
 
     @property
@@ -237,7 +244,7 @@ class ILFixedSizeTag(ILTag):
     of tags with fixed size payloads.
     """
 
-    def __init__(self, id: int, value_size: int) -> None:
+    def __init__(self, id: int, value_size: int, allow_implicit=False) -> None:
         """
         Creates a new instance of this class.
 
@@ -246,7 +253,7 @@ class ILFixedSizeTag(ILTag):
         - `value_size`: The size of the value in bytes. It cannot exceed
           2**64 - 1;
         """
-        super().__init__(id)
+        super().__init__(id, allow_implicit)
         assert_int_bounds(value_size, 8, False)
         self._value_size = value_size
 
@@ -259,7 +266,7 @@ class ILBaseIntTag(ILFixedSizeTag):
     This is the base class for all big integer tags.
     """
 
-    def __init__(self, id: int, value_size: int, signed: bool, value=0) -> None:
+    def __init__(self, id: int, value_size: int, signed: bool, value=0, allow_implicit=False) -> None:
         """
         Creates new instance of this class.
 
@@ -270,7 +277,7 @@ class ILBaseIntTag(ILFixedSizeTag):
         - `value`: The actual integer value. Its boundaries are checked based on the
           specified sizes;
         """
-        super().__init__(id, value_size)
+        super().__init__(id, value_size, allow_implicit)
         if value_size not in [1, 2, 4, 8]:
             raise ValueError('value_size must be 1, 2, 4 or 8.')
         self.signed = signed
@@ -311,7 +318,7 @@ class ILBaseFloatTag(ILFixedSizeTag):
     This class implements the base class for floating point tags with 32 and 64 bits.
     """
 
-    def __init__(self, id: int, value_size: int, value: float = 0.0) -> None:
+    def __init__(self, id: int, value_size: int, value: float = 0.0, allow_implicit=False) -> None:
         """
         Creates new instance of this class.
 
@@ -320,7 +327,7 @@ class ILBaseFloatTag(ILFixedSizeTag):
         - `value_size`: The size of the value in bytes. It can be 4 or 8;
         - `value`: The actual float value;
         """
-        super().__init__(id, value_size)
+        super().__init__(id, value_size, allow_implicit)
         if value_size not in [4, 8]:
             raise ValueError('value_size must be 4 or 8.')
         self.value = value

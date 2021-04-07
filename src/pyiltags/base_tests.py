@@ -83,36 +83,38 @@ class TestILTagFactory(unittest.TestCase):
 class TestILTag(unittest.TestCase):
 
     def test_constructor(self):
-        t = ILTag(0)
+        t = ILTag(0, True)
         self.assertEqual(t.id, 0)
 
         t = ILTag(2**64 - 1)
         self.assertEqual(t.id, 2**64 - 1)
 
+        for id in range(16):
+            self.assertRaises(ValueError, ILTag, id, False)
         self.assertRaises(ValueError, ILTag, -1)
         self.assertRaises(ValueError, ILTag, 2**64)
 
     def test_implicit(self):
         for id in range(16):
-            t = ILTag(id)
+            t = ILTag(id, True)
             self.assertTrue(t.implicit)
         t = ILTag(16)
         self.assertFalse(t.implicit)
 
     def test_standard(self):
         for id in range(32):
-            t = ILTag(id)
+            t = ILTag(id, True)
             self.assertTrue(t.standard)
         t = ILTag(32)
         self.assertFalse(t.standard)
 
     def test_value_size(self):
-        t = ILTag(0)
+        t = ILTag(123)
         self.assertRaises(NotImplementedError, t.value_size)
 
     def test_tag_size(self):
         for id in range(16):
-            t = ILTag(id)
+            t = ILTag(id, True)
             t.value_size = MagicMock(return_value=id)
             size = ilint_size(id) + id
             self.assertEqual(t.tag_size(), size)
@@ -128,12 +130,12 @@ class TestILTag(unittest.TestCase):
             self.assertEqual(len(t), size)
 
     def test_deserialize_value(self):
-        t = ILTag(0)
+        t = ILTag(123)
         self.assertRaises(NotImplementedError, t.deserialize_value,
                           ILTagFactory(), 0, io.BytesIO())
 
     def test_serialize_value(self):
-        t = ILTag(0)
+        t = ILTag(123)
         self.assertRaises(NotImplementedError, t.serialize_value, io.BytesIO())
 
     def test_serialize(self):
@@ -158,7 +160,7 @@ class TestILTag(unittest.TestCase):
         self.assertEqual(exp.read(), writer.read())
 
         # Implicit
-        t = DummyILTag(1)
+        t = DummyILTag(1, True)
         writer = io.BytesIO()
         t.serialize(writer)
 
@@ -259,7 +261,7 @@ class TestILRawTag(unittest.TestCase):
 class TestILFixedSizeTag(unittest.TestCase):
 
     def test_constructor(self):
-        t = ILFixedSizeTag(0, 0)
+        t = ILFixedSizeTag(0, 0, True)
         self.assertEquals(0, t.id)
         self.assertEquals(0, t.value_size())
 
@@ -273,7 +275,7 @@ class TestILBaseIntTag(unittest.TestCase):
     def constructor_test_core(self, value_size: int):
         bits = value_size * 8
         for v in [0, 2**bits - 1]:
-            t = ILBaseIntTag(12, value_size, False, v)
+            t = ILBaseIntTag(12, value_size, False, v, True)
             self.assertEqual(12, t.id)
             self.assertEqual(value_size, t.value_size())
             self.assertEqual(v, t.value)
@@ -283,7 +285,7 @@ class TestILBaseIntTag(unittest.TestCase):
                           value_size, False, 2**bits)
         bits -= 1
         for v in [-(2**bits), (2**bits) - 1]:
-            t = ILBaseIntTag(13, value_size, True, v)
+            t = ILBaseIntTag(13, value_size, True, v, True)
             self.assertEqual(13, t.id)
             self.assertEqual(value_size, t.value_size())
             self.assertEqual(v, t.value)
@@ -307,20 +309,20 @@ class TestILBaseIntTag(unittest.TestCase):
     def value_core(self, value_size: int):
         bits = value_size * 8
         for v in [0, 2**bits - 1]:
-            t = ILBaseIntTag(12, value_size, False, 0)
+            t = ILBaseIntTag(12, value_size, False, 0, True)
             t.value = v
             self.assertEqual(v, t.value)
         for v in [-1, 2**bits]:
-            t = ILBaseIntTag(12, value_size, False, 0)
+            t = ILBaseIntTag(12, value_size, False, 0, True)
             with self.assertRaises(ValueError):
                 t.value = v
         bits -= 1
         for v in [-(2**bits), (2**bits) - 1]:
-            t = ILBaseIntTag(12, value_size, True, 0)
+            t = ILBaseIntTag(12, value_size, True, 0, True)
             t.value = v
             self.assertEqual(v, t.value)
         for v in [-(2 ** bits + 1), 2**bits]:
-            t = ILBaseIntTag(12, value_size, True, 0)
+            t = ILBaseIntTag(12, value_size, True, 0, True)
             with self.assertRaises(ValueError):
                 t.value = v
 
@@ -333,7 +335,7 @@ class TestILBaseIntTag(unittest.TestCase):
     def deserialize_value_core(self, value_size: int, signed: bool):
         sample = b'FEDCBA9876543210'
 
-        t = ILBaseIntTag(0, value_size, signed, 0)
+        t = ILBaseIntTag(0, value_size, signed, 0, True)
         reader = io.BytesIO(sample[:value_size])
         t.deserialize_value(None, value_size, reader)
         exp = int.from_bytes(sample[:value_size],
@@ -359,7 +361,7 @@ class TestILBaseIntTag(unittest.TestCase):
 
         val = int.from_bytes(sample[:value_size],
                              byteorder='big', signed=signed)
-        t = ILBaseIntTag(0, value_size, signed, val)
+        t = ILBaseIntTag(0, value_size, signed, val, True)
         writer = io.BytesIO()
         t.serialize_value(writer)
         self.assertEqual(value_size, writer.tell())
@@ -380,22 +382,22 @@ class TestILBaseIntTag(unittest.TestCase):
 class TestILBaseFloatTag(unittest.TestCase):
 
     def test_constructor(self):
-        t = ILBaseFloatTag(1, 4)
+        t = ILBaseFloatTag(1, 4, allow_implicit=True)
         self.assertEqual(1, t.id)
         self.assertEqual(4, t.value_size())
         self.assertEqual(0, t.value)
 
-        t = ILBaseFloatTag(1, 4, 1.0)
+        t = ILBaseFloatTag(1, 4, 1.0, allow_implicit=True)
         self.assertEqual(1, t.id)
         self.assertEqual(4, t.value_size())
         self.assertEqual(1.0, t.value)
 
-        t = ILBaseFloatTag(1, 8)
+        t = ILBaseFloatTag(1, 8, allow_implicit=True)
         self.assertEqual(1, t.id)
         self.assertEqual(8, t.value_size())
         self.assertEqual(0, t.value)
 
-        t = ILBaseFloatTag(1, 8, 1.0)
+        t = ILBaseFloatTag(1, 8, 1.0, allow_implicit=True)
         self.assertEqual(1, t.id)
         self.assertEqual(8, t.value_size())
         self.assertEqual(1.0, t.value)
@@ -406,14 +408,14 @@ class TestILBaseFloatTag(unittest.TestCase):
         self.assertRaises(ValueError, ILBaseFloatTag, 1, 9, 0.0)
 
     def test_value(self):
-        t = ILBaseFloatTag(1, 4)
+        t = ILBaseFloatTag(1, 4, allow_implicit=True)
         self.assertEqual(0, t.value)
         self.assertTrue(isinstance(t.value, float))
         t.value = 1
         self.assertEqual(1.0, t.value)
         self.assertTrue(isinstance(t.value, float))
 
-        t = ILBaseFloatTag(1, 8)
+        t = ILBaseFloatTag(1, 8, allow_implicit=True)
         self.assertEqual(0, t.value)
         self.assertTrue(isinstance(t.value, float))
         t.value = 1
@@ -423,7 +425,7 @@ class TestILBaseFloatTag(unittest.TestCase):
     def test_deserialize_value(self):
         val = 3.1415927410125732
         serialized = struct.pack('>f', val)
-        t = ILBaseFloatTag(1, 4)
+        t = ILBaseFloatTag(1, 4, allow_implicit=True)
         t.deserialize_value(None, 4, io.BytesIO(serialized))
         self.assertEqual(val, t.value)
         self.assertRaises(EOFError, t.deserialize_value,
@@ -433,7 +435,7 @@ class TestILBaseFloatTag(unittest.TestCase):
 
         val = 3.141592653589793
         serialized = struct.pack('>d', val)
-        t = ILBaseFloatTag(1, 8)
+        t = ILBaseFloatTag(1, 8, allow_implicit=True)
         t.deserialize_value(None, 8, io.BytesIO(serialized))
         self.assertEqual(val, t.value)
         self.assertRaises(EOFError, t.deserialize_value,
@@ -444,7 +446,7 @@ class TestILBaseFloatTag(unittest.TestCase):
     def test_serialize_value(self):
         val = 3.1415927410125732
         serialized = struct.pack('>f', val)
-        t = ILBaseFloatTag(1, 4, val)
+        t = ILBaseFloatTag(1, 4, val, True)
         writer = io.BytesIO()
         t.serialize_value(writer)
         self.assertEqual(4, writer.tell())
@@ -453,7 +455,7 @@ class TestILBaseFloatTag(unittest.TestCase):
 
         val = 3.141592653589793
         serialized = struct.pack('>d', val)
-        t = ILBaseFloatTag(1, 8, val)
+        t = ILBaseFloatTag(1, 8, val, True)
         writer = io.BytesIO()
         t.serialize_value(writer)
         self.assertEqual(8, writer.tell())

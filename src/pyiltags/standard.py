@@ -86,7 +86,7 @@ class ILNullTag(ILFixedSizeTag):
     """
 
     def __init__(self, id: int = ILTAG_NULL_ID) -> None:
-        super().__init__(id, 0)
+        super().__init__(id, 0, True)
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size != 0:
@@ -102,7 +102,7 @@ class ILBoolTag(ILFixedSizeTag):
     """
 
     def __init__(self, value: bool = False, id: int = ILTAG_BOOL_ID) -> None:
-        super().__init__(id, 1)
+        super().__init__(id, 1, True)
         self.value = value
 
     @property
@@ -139,47 +139,47 @@ class ILBoolTag(ILFixedSizeTag):
 
 class ILInt8Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_INT8_ID) -> None:
-        super().__init__(id, 1, True, value)
+        super().__init__(id, 1, True, value, True)
 
 
 class ILUInt8Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_UINT8_ID) -> None:
-        super().__init__(id, 1, False, value)
+        super().__init__(id, 1, False, value, True)
 
 
 class ILInt16Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_INT16_ID) -> None:
-        super().__init__(id, 2, True, value)
+        super().__init__(id, 2, True, value, True)
 
 
 class ILUInt16Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_UINT16_ID) -> None:
-        super().__init__(id, 2, False, value)
+        super().__init__(id, 2, False, value, True)
 
 
 class ILInt32Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_INT32_ID) -> None:
-        super().__init__(id, 4, True, value)
+        super().__init__(id, 4, True, value, True)
 
 
 class ILUInt32Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_UINT32_ID) -> None:
-        super().__init__(id, 4, False, value)
+        super().__init__(id, 4, False, value, True)
 
 
 class ILInt64Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_INT64_ID) -> None:
-        super().__init__(id, 8, True, value)
+        super().__init__(id, 8, True, value, True)
 
 
 class ILUInt64Tag(ILBaseIntTag):
     def __init__(self, value: int = 0, id: int = ILTAG_UINT64_ID) -> None:
-        super().__init__(id, 8, False, value)
+        super().__init__(id, 8, False, value, True)
 
 
 class ILILInt64Tag(ILTag):
     def __init__(self, value: int = 0, id: int = ILTAG_ILINT64_ID) -> None:
-        super().__init__(id)
+        super().__init__(id, True)
         self.value = value
 
     @property
@@ -216,17 +216,17 @@ class ILILInt64Tag(ILTag):
 
 class ILBinary32Tag(ILBaseFloatTag):
     def __init__(self, value: float = 0.0, id: int = ILTAG_BINARY32_ID) -> None:
-        super().__init__(id, 4, value=value)
+        super().__init__(id, 4, value, True)
 
 
 class ILBinary64Tag(ILBaseFloatTag):
     def __init__(self, value: float = 0.0, id: int = ILTAG_BINARY64_ID) -> None:
-        super().__init__(id, 8, value=value)
+        super().__init__(id, 8, value, True)
 
 
 class ILBinary128Tag(ILFixedSizeTag):
     def __init__(self, value: bytes = None, id: int = ILTAG_BINARY128_ID) -> None:
-        super().__init__(id, 16)
+        super().__init__(id, 16, True)
         if value is None:
             self.value = b'\x00' * 16
         else:
@@ -258,8 +258,20 @@ class ILByteArrayTag(ILRawTag):
 
 
 class ILStringTag(ILTag):
+    """
+    This class implements the tag ILTAG_STRING_ID.
+    """
+
     def __init__(self, value: str = None, id: int = ILTAG_STRING_ID) -> None:
+        """
+        Creates a new instance of this class.
+
+        Parameters:
+        - `value`: The value of the tag. Must be a string or None;
+        - `id`: The id if necessary.
+        """
         super().__init__(id)
+        self.value = value
 
     @property
     def value(self) -> str:
@@ -267,23 +279,48 @@ class ILStringTag(ILTag):
 
     @value.setter
     def value(self, value: str):
-        if not isinstance(value, str):
+        if value is None:
+            self._value = None
+            self._utf8 = None
+        elif isinstance(value, str):
+            self._value = value
+            self._utf8 = codecs.encode(value, 'utf-8')
+        else:
             raise TypeError('The value must be a str.')
-        self._value = value
-        self._utf8 = codecs.encode(value, 'utf-8')
 
     def value_size(self) -> int:
-        return len(self._utf8)
+        if self.utf8 is None:
+            return 0
+        else:
+            return len(self.utf8)
+
+    @property
+    def utf8(self) -> bytes:
+        return self.utf8
+
+    @utf8.setter
+    def utf8(self, utf8: bytes):
+        if utf8 is None:
+            self._value = None
+            self._utf8 = None
+        elif isinstance(utf8, bytes):
+            self._value = codecs.decode(utf8, 'utf-8')
+            if isinstance(utf8, bytearray):
+                self._utf8 = bytes(utf8)
+            else:
+                self._utf8 = utf8
+        else:
+            raise TypeError(
+                'The value must be an instance of bytes or bytearray.')
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        self._utf8 = read_bytes(tag_size, reader)
         try:
-            self._value = codecs.decode(self._utf8, 'utf-8')
+            self.utf8 = read_bytes(tag_size, reader)
         except ValueError:
-            raise ILTagCorruptedError('Corrupted string tag.')
+            raise ILTagCorruptedError('Corrupted utf-8 string.')
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        writer.write(self._utf8)
+        writer.write(self.utf8)
 
 
 class ILBigIntegerTag(ILRawTag):
