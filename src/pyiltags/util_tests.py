@@ -121,3 +121,25 @@ class TestUtil(unittest.TestCase):
                           -9223372036854775809, 8, True)
         self.assertRaises(ValueError, assert_int_bounds,
                           9223372036854775808, 8, True)
+
+
+class TestTypeRestrictedList(unittest.TestCase):
+
+    def test_default(self):
+        l = TypeRestrictedList()
+
+        self.assertEqual(object, l.allowed_type)
+        self.assertEqual(object, l.allowed_type)
+        l.append(1)
+        l.append(1.0)
+        l.append('')
+
+    def test_restricted(self):
+        l = TypeRestrictedList()
+        l.allowed_type = int
+
+        self.assertEqual(int, l.allowed_type)
+        l.append(1)
+        self.assertRaises(TypeError, l.append, 1.0)
+        self.assertRaises(TypeError, l.append, '')
+        self.assertRaises(TypeError, l.append, None)

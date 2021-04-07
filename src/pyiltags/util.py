@@ -28,7 +28,7 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-from typing import Tuple
+from typing import Generic, Tuple, TypeVar
 
 
 _INT_BOUNDS = {
@@ -87,3 +87,46 @@ def assert_int_bounds(value: int, size: int, signed: bool) -> None:
     if value < bounds[0] or value > bounds[1]:
         raise ValueError(
             f'The value must be between {bounds[0]} and {bounds[1]}.')
+
+
+class TypeRestrictedList(list):
+    """
+    This class implements a list that restricts the types of elements that
+    """
+
+    @property
+    def allowed_type(self):
+        try:
+            return self._allowed_type
+        except AttributeError:
+            self._allowed_type = object
+            return self._allowed_type
+
+    @allowed_type.setter
+    def allowed_type(self, type):
+        self._allowed_type = type
+
+    def __iadd__(self, x):
+        self.assert_valid_values(x)
+        return super().__iadd__(x)
+
+    def __add__(self, x):
+        self.assert_valid_values(x)
+        return super().__add__(x)
+
+    def assert_valid_values(self, values):
+        for v in values:
+            self.assert_valid_value(v)
+
+    def assert_valid_value(self, value):
+        if not isinstance(value, self.allowed_type):
+            raise TypeError(
+                f'Only subclasses of {self.allowed_type} are accepted by this list.')
+
+    def append(self, value) -> None:
+        self.assert_valid_value(value)
+        return super().append(value)
+
+    def __setitem__(self, key, value):
+        self.assert_valid_value(value)
+        super().__setitem__(key, value)

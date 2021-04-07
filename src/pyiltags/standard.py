@@ -401,16 +401,19 @@ class ILIntArrayTag(ILTag):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        self.values.clear()
         if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
-        r = io.BytesIO(read_bytes(tag_size))
-        count, = pyilint.ilint_decode_from_stream(r)
-        self.values.clear()
+        count, = pyilint.ilint_decode_from_stream(reader)
         for i in range(count):
-            v, = pyilint.ilint_decode_from_stream(r)
+            v, = pyilint.ilint_decode_from_stream(reader)
             self.values.append(v)
 
     def serialize_value(self, writer: io.IOBase) -> None:
+        for v in self.values:
+            if not isinstance(v, int):
+                raise TypeError('At least one item is not an integer.')
+            assert_int_bounds(v, 8, False)
         pyilint.ilint_encode_to_stream(len(self.values), writer)
         for v in self.values:
             pyilint.ilint_encode_to_stream(v, writer)
@@ -435,14 +438,16 @@ class ILTagArrayTag(ILTag):
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < (1 + 1):
             raise ILTagCorruptedError('Corrupted tag.')
-        r = io.BytesIO(read_bytes(tag_size))
-        count, = pyilint.ilint_decode_from_stream(r)
+        count, = pyilint.ilint_decode_from_stream(reader)
         self.values.clear()
         for i in range(count):
-            t = tag_factory.deserialize(r)
+            t = tag_factory.deserialize(reader)
             self.values.append(t)
 
     def serialize_value(self, writer: io.IOBase) -> None:
+        for t in self.values:
+            if not isinstance(t, ILTag):
+                raise TypeError('At least one item is not an ILTag.')
         pyilint.ilint_encode_to_stream(len(self.values), writer)
         for t in self.values:
             t.serialize(writer)
@@ -474,14 +479,204 @@ class ILTagSequenceTag(ILTag):
 
     def serialize_value(self, writer: io.IOBase) -> None:
         for t in self.values:
+            if not isinstance(t, ILTag):
+                raise TypeError('At least one item is not an ILTag.')
+        for t in self.values:
             t.serialize(writer)
 
 
-class ILTagSequenceTag(ILTag):
+class ILRangeTag(ILTag):
 
-    def __init__(self, id: int = ILTAG_ILTAG_SEQ_ID) -> None:
+    def __init__(self, first: int = 0, count: int = 0, id: int = ILTAG_RANGE_ID) -> None:
+        super().__init__(id)
+        self.first = first
+        self.count = count
+
+    @property
+    def first(self) -> int:
+        return self._first
+
+    @first.setter
+    def first(self, value: int):
+        if not isinstance(value, int):
+            raise TypeError('first must be an integer.')
+        assert_int_bounds(value, 8, False)
+        self._first = value
+
+    @property
+    def count(self) -> int:
+        return self._first
+
+    @count.setter
+    def count(self, value: int):
+        if not isinstance(value, int):
+            raise TypeError('count must be an integer.')
+        assert_int_bounds(value, 2, False)
+        self._first = value
+
+    def value_size(self) -> int:
+        return pyilint.ilint_size(self.first) + 2
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < 3:
+            raise ILTagCorruptedError('Corrupted range.')
+        try:
+            self.first, = pyilint.ilint_decode_from_stream(reader)
+            self.count = read_int(2, False, reader)
+        except ValueError:
+            raise ILTagCorruptedError('Corrupted range.')
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        pyilint.ilint_encode_to_stream(self.first, writer)
+        write_int(self.count, 2, False, writer)
+
+
+class ILVersionTag(ILTag):
+
+    def __init__(self, major: int = 0, minor: int = 0, revision: int = 0, build: int = 0, id: int = ILTAG_VERSION_ID) -> None:
+        super().__init__(id)
+        self._values = [0, 0, 0, 0]
+        self.major = major
+        self.minor = minor
+        self.revision = revision
+        self.build = build
+
+    def _set_field_core(self, value: int, index: int):
+        if not isinstance(value, int):
+            raise TypeError('first must be an integer.')
+        assert_int_bounds(value, 4, True)
+        self._values[index] = value
+
+    @property
+    def major(self) -> int:
+        return self._values[0]
+
+    @major.setter
+    def major(self, value: int):
+        self._set_field_core(value, 0)
+
+    @property
+    def minor(self) -> int:
+        return self._values[1]
+
+    @minor.setter
+    def minor(self, value: int):
+        self._set_field_core(value, 1)
+
+    @property
+    def revision(self) -> int:
+        return self._values[2]
+
+    @revision.setter
+    def revision(self, value: int):
+        self._set_field_core(value, 2)
+
+    @property
+    def build(self) -> int:
+        return self._values[3]
+
+    @build.setter
+    def build(self, value: int):
+        self._set_field_core(value, 3)
+
+    def value_size(self) -> int:
+        return 4 * 4
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size != 16:
+            raise ILTagCorruptedError('Corrupted range.')
+        for i in range(4):
+            self._values[i] = read_int(4, True, reader)
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        for i in range(4):
+            write_int(self._values[i], 4, True, writer)
+
+
+class ILOIDTag(ILIntArrayTag):
+    def __init__(self) -> None:
+        super().__init__(ILTAG_OID_ID)
+
+
+class ILDictionaryTag(ILTag):
+
+    def __init__(self, id: int = ILTAG_DICT_ID) -> None:
         super().__init__(id)
         self._values = []
+
+    @property
+    def values(self) -> List[Tuple[ILStringTag, ILTag]]:
+        return self._values
+
+    def value_size(self) -> int:
+        size = pyilint.ilint_size(len(self.values))
+        for pair in self.values:
+            size += pair[0].tag_size() + pair[1].tag_size()
+        return size
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < (1 + 1):
+            raise ILTagCorruptedError('Corrupted tag.')
+        count, = pyilint.ilint_decode_from_stream(reader)
+        self.values.clear()
+        for i in range(count):
+            key = tag_factory.deserialize(reader)
+            value = tag_factory.deserialize(reader)
+            if not isinstance(key, ILStringTag):
+                raise ILTagCorruptedError('Corrupted tag.')
+            self.values.append((key, value))
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        for t in self.values:
+            if not isinstance(t[0], ILStringTag):
+                raise TypeError('At least one key is not a ILStringTag.')
+            if not isinstance(t[1], ILTag):
+                raise TypeError('At least one value is not a ILTag.')
+        pyilint.ilint_encode_to_stream(len(self.values), writer)
+        for t in self.values:
+            t[0].serialize(writer)
+            t[1].serialize(writer)
+
+
+class ILStringDictionaryTag(ILTag):
+
+    def __init__(self, id: int = ILTAG_STRDICT_ID) -> None:
+        super().__init__(id)
+        self._values = []
+
+    @property
+    def values(self) -> List[Tuple[ILStringTag, ILStringTag]]:
+        return self._values
+
+    def value_size(self) -> int:
+        size = pyilint.ilint_size(len(self.values))
+        for pair in self.values:
+            size += pair[0].tag_size() + pair[1].tag_size()
+        return size
+
+    def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < (1 + 1):
+            raise ILTagCorruptedError('Corrupted tag.')
+        count, = pyilint.ilint_decode_from_stream(reader)
+        self.values.clear()
+        for i in range(count):
+            key = tag_factory.deserialize(reader)
+            value = tag_factory.deserialize(reader)
+            if isinstance(key, ILStringTag) and isinstance(value, ILStringTag):
+                self.values.append((key, value))
+            else:
+                raise ILTagCorruptedError('Corrupted tag.')
+
+    def serialize_value(self, writer: io.IOBase) -> None:
+        for t in self.values:
+            if not isinstance(t[0], ILStringTag):
+                raise TypeError('At least one key is not a ILStringTag.')
+            if not isinstance(t[1], ILStringTag):
+                raise TypeError('At least one value is not a ILStringTag.')
+        pyilint.ilint_encode_to_stream(len(self.values), writer)
+        for t in self.values:
+            t[0].serialize(writer)
+            t[1].serialize(writer)
 
 
 class ILStandardTagFactory(ILTagFactory):
@@ -526,11 +721,11 @@ class ILStandardTagFactory(ILTagFactory):
         ILTAG_ILINT64_ARRAY_ID: ILIntArrayTag,
         ILTAG_ILTAG_ARRAY_ID: ILTagArrayTag,
         ILTAG_ILTAG_SEQ_ID: ILTagSequenceTag,
-        ILTAG_RANGE_ID: None,
-        ILTAG_VERSION_ID: None,
-        ILTAG_OID_ID: None,
-        ILTAG_DICT_ID: None,
-        ILTAG_STRDICT_ID: None
+        ILTAG_RANGE_ID: ILRangeTag,
+        ILTAG_VERSION_ID: ILVersionTag,
+        ILTAG_OID_ID: ILOIDTag,
+        ILTAG_DICT_ID: ILDictionaryTag,
+        ILTAG_STRDICT_ID: ILStringDictionaryTag
     }
 
     def create(self, id: int) -> 'ILTag':
@@ -553,5 +748,12 @@ class ILStandardTagFactory(ILTagFactory):
             tag_size = ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[tag_id]
         else:
             tag_size, = pyilint.ilint_decode_from_stream(reader)
-        tag.deserialize_value(self, tag_size, reader)
+        if tag_id == ILTAG_ILINT64_ID:
+            tag.deserialize_value(self, tag_size, reader)
+        else:
+            value_reader = io.BytesIO(read_bytes(tag_size, reader))
+            tag.deserialize_value(self, tag_size, value_reader)
+            if value_reader.tell() != tag_size:
+                raise ILTagCorruptedError(
+                    f'Some bytes of the value where not used by {tag.__class__}.deserialize_value(). The tag value size is {tag_size}.')
         return tag
