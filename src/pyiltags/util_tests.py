@@ -121,3 +121,110 @@ class TestUtil(unittest.TestCase):
                           -9223372036854775809, 8, True)
         self.assertRaises(ValueError, assert_int_bounds,
                           9223372036854775808, 8, True)
+
+
+class TestRestrictListMixin(unittest.TestCase):
+
+    class A:
+        pass
+
+    class ExampleRestrictListMixin(A, RestrictListMixin):
+        def assert_value_type(self, value: T):
+            if not isinstance(value, int):
+                raise TypeError('Only integers are allowed.')
+
+    def test_constructor(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+        self.assertTrue(isinstance(l._values, list))
+
+    def test_assert_value_type(self):
+        l = RestrictListMixin()
+
+        l.assert_value_type(None)
+        l.assert_value_type(1)
+        l.assert_value_type(1.0)
+        l.assert_value_type('')
+        l.assert_value_type([])
+
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+        l.assert_value_type(1)
+        self.assertRaises(TypeError, l.assert_value_type, None)
+        self.assertRaises(TypeError, l.assert_value_type, 1.0)
+        self.assertRaises(TypeError, l.assert_value_type, '')
+        self.assertRaises(TypeError, l.assert_value_type, [])
+
+    def test_append(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        l.append(1)
+        l.append(2)
+        self.assertRaises(TypeError, l.append, None)
+        self.assertRaises(TypeError, l.append, 1.0)
+        self.assertRaises(TypeError, l.append, '')
+        self.assertRaises(TypeError, l.append, [])
+
+    def test_getset_item(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        l.append(1)
+        l.append(2)
+        self.assertEqual(1, l[0])
+        self.assertEqual(2, l[1])
+        for v in [1.0, '', []]:
+            with self.assertRaises(TypeError):
+                l[0] = v
+
+    def test_len(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        self.assertEqual(0, len(l))
+        l.append(1)
+        self.assertEqual(1, len(l))
+        l.append(2)
+        self.assertEqual(2, len(l))
+
+    def test_pop(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        l.append(0)
+        l.append(1)
+        l.append(2)
+        l.append(3)
+
+        self.assertEqual(4, len(l))
+        self.assertEqual(1, l.pop(1))
+        self.assertEqual(3, len(l))
+        self.assertEqual(0, l[0])
+        self.assertEqual(2, l[1])
+        self.assertEqual(3, l[2])
+
+        self.assertEqual(3, l.pop())
+        self.assertEqual(2, len(l))
+        self.assertEqual(0, l[0])
+        self.assertEqual(2, l[1])
+
+        self.assertEqual(0, l.pop(0))
+        self.assertEqual(1, len(l))
+        self.assertEqual(2, l[0])
+
+    def test_clear(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        l.append(0)
+        l.append(1)
+        l.append(2)
+        l.append(3)
+
+        self.assertEqual(4, len(l))
+        l.clear()
+        self.assertEqual(0, len(l))
+
+    def test_bool(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        self.assertFalse(bool(l))
+        l.append(0)
+        self.assertTrue(bool(l))
+        l.append(1)
+        l.clear()
+        self.assertFalse(bool(l))

@@ -30,6 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from typing import Generic, Tuple, TypeVar
 
+T = TypeVar('T')
 
 _INT_BOUNDS = {
     1: (0, 255),
@@ -87,3 +88,52 @@ def assert_int_bounds(value: int, size: int, signed: bool) -> None:
     if value < bounds[0] or value > bounds[1]:
         raise ValueError(
             f'The value must be between {bounds[0]} and {bounds[1]}.')
+
+
+class RestrictListMixin(Generic[T]):
+    """
+    This Mixin class adds a simple restricted type list operation to
+    other classes.
+
+    The restriction is implemented by the method assert_value_type() 
+    that should raise a `TypeError` if the value that will be added
+    cannot be accepted.
+
+    This functionality was added to avoid potencial type errors in
+    this library.
+    """
+
+    def __init__(self) -> None:
+        self._values = []
+
+    def assert_value_type(self, value: T):
+        pass
+
+    def append(self, value: T):
+        self.assert_value_type(value)
+        self._values.append(value)
+
+    def clear(self):
+        self._values.clear()
+
+    def pop(self, key: int = -1) -> T:
+        return self._values.pop(key)
+
+    def __bool__(self) -> bool:
+        return bool(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __getitem__(self, key: int) -> T:
+        return self._values[key]
+
+    def __setitem__(self, key: int, value: T):
+        self.assert_value_type(value)
+        self._values[key] = value
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __repr__(self) -> str:
+        return str(self._values)
