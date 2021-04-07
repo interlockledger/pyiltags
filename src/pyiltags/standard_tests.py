@@ -236,18 +236,59 @@ class TestILILInt64Tag(unittest.TestCase):
             t = ILILInt64Tag(v)
             self.assertEqual(pyilint.ilint_size(t.value), t.value_size())
 
-    def test_deserialize_value(self):
+    def test_deserialize_value_implicit(self):
 
         for v in [0, 0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
                   0xFFFFFFFFFF, 0xFFFFFFFFFFFF,
                   0xFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF]:
-            t = ILILInt64Tag(v)
+            t = ILILInt64Tag()
             val = bytearray()
             size = pyilint.ilint_encode(v, val)
             reader = io.BytesIO(val)
             t.deserialize_value(None, size, reader)
             self.assertEqual(size, reader.tell())
             self.assertEqual(v, t.value)
+
+        t = ILILInt64Tag()
+        reader = io.BytesIO(bytes.fromhex('FFFFFFFFFFFFFFFFFF'))
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 9, reader)
+        reader.seek(0)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 0, reader)
+        reader.seek(0)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 10, reader)
+        reader.seek(0)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 8, reader)
+
+    def test_deserialize_value_explicit(self):
+
+        for v in [0, 0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+                  0xFFFFFFFFFF, 0xFFFFFFFFFFFF,
+                  0xFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF]:
+            t = ILILInt64Tag(id=1234)
+            val = bytearray()
+            size = pyilint.ilint_encode(v, val)
+            reader = io.BytesIO(val)
+            t.deserialize_value(None, size, reader)
+            self.assertEqual(size, reader.tell())
+            self.assertEqual(v, t.value)
+
+        t = ILILInt64Tag(id=1234)
+        reader = io.BytesIO(bytes.fromhex('FFFFFFFFFFFFFFFFFF00'))
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 9, reader)
+        reader.seek(0)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 0, reader)
+        reader.seek(0)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 10, reader)
+        reader.seek(0)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 8, reader)
 
     def test_serialize_value(self):
 

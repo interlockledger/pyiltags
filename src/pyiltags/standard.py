@@ -71,7 +71,7 @@ ILTAG_STANDARD_SIZES = [
     4,  # TAG_UINT32
     8,  # TAG_INT64
     8,  # TAG_UINT64
-    -1,  # TAG_ILINT64 - Not defined in this table
+    9,  # TAG_ILINT64 (maximum size possible).
     4,  # TAG_BINARY32
     8,  # TAG_BINARY64
     16,  # TAG_BINARY128
@@ -197,18 +197,42 @@ class ILILInt64Tag(ILTag):
         return pyilint.ilint_size(self.value)
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        if tag_size < 1:
-            raise EOFError('Unable to read the value of the tag.')
+        """
+        This method behaves a little different if the tag is implicit or explicit. In the implicit
+        case, the tag_size cannot be discovered without looking into the value itself. Thus, it is 
+        necessary to set tag_size to any value from 1 to 9. The actual tag_size will be discovered during the
+        deserialization. If the tag is explicit, the tag_size must match the actual ILInt size, otherwise the
+        deserialization will fail.
+        """
+        if tag_size < 1 or tag_size > 9:
+            raise ILTagCorruptedError('Corrupted ILInt value.')
+        try:
+            if self.implicit:
+                self.__deserialize_value_implicit(
+                    tag_factory, tag_size, reader)
+            else:
+                self.__deserialize_value_explicit(
+                    tag_factory, tag_size, reader)
+        except ValueError:
+            raise ILTagCorruptedError('Invalid ILInt value.')
+
+    def __deserialize_value_implicit(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         header = read_bytes(1, reader)[0]
         size = pyilint.ilint_size_from_header(header)
         if size == 1:
             val = header
         else:
             if size > tag_size:
-                raise EOFError('Unable to read the value of the tag.')
+                raise ValueError()
             val, size = pyilint.ilint_decode_multibyte_core(
                 header, size, read_bytes(size - 1, reader))
         self.value = val
+
+    def __deserialize_value_explicit(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        value, size = pyilint.ilint_decode(read_bytes(tag_size, reader))
+        if size != tag_size:
+            raise ILTagCorruptedError('Invalid ILInt value.')
+        self._value = value
 
     def serialize_value(self, writer: io.IOBase) -> None:
         pyilint.ilint_encode_to_stream(self.value, writer)
