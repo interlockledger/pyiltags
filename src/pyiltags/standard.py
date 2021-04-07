@@ -120,46 +120,82 @@ class ILBoolTag(ILFixedSizeTag):
 
 
 class ILInt8Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_INT8_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_INT8_ID) -> None:
         super().__init__(id, 1, True, value, True)
 
 
 class ILUInt8Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_UINT8_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_UINT8_ID) -> None:
         super().__init__(id, 1, False, value, True)
 
 
 class ILInt16Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_INT16_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_INT16_ID) -> None:
         super().__init__(id, 2, True, value, True)
 
 
 class ILUInt16Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_UINT16_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_UINT16_ID) -> None:
         super().__init__(id, 2, False, value, True)
 
 
 class ILInt32Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_INT32_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_INT32_ID) -> None:
         super().__init__(id, 4, True, value, True)
 
 
 class ILUInt32Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_UINT32_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_UINT32_ID) -> None:
         super().__init__(id, 4, False, value, True)
 
 
 class ILInt64Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_INT64_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_INT64_ID) -> None:
         super().__init__(id, 8, True, value, True)
 
 
 class ILUInt64Tag(ILBaseIntTag):
+    """
+    This class implements the tag ILTAG_INT64_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_UINT64_ID) -> None:
         super().__init__(id, 8, False, value, True)
 
 
 class ILILInt64Tag(ILTag):
+    """
+    This class implements the tag ILTAG_ILINT64_ID.
+    """
+
     def __init__(self, value: int = 0, id: int = ILTAG_ILINT64_ID) -> None:
         super().__init__(id, True)
         self.value = value
@@ -221,16 +257,29 @@ class ILILInt64Tag(ILTag):
 
 
 class ILBinary32Tag(ILBaseFloatTag):
+    """
+    This class implements the tag ILTAG_BINARY32_ID.
+    """
+
     def __init__(self, value: float = 0.0, id: int = ILTAG_BINARY32_ID) -> None:
         super().__init__(id, 4, value, True)
 
 
 class ILBinary64Tag(ILBaseFloatTag):
+    """
+    This class implements the tag ILTAG_BINARY64_ID.
+    """
+
     def __init__(self, value: float = 0.0, id: int = ILTAG_BINARY64_ID) -> None:
         super().__init__(id, 8, value, True)
 
 
 class ILBinary128Tag(ILFixedSizeTag):
+    """
+    This class implements the tag ILTAG_BINARY128_ID. Since Python does not support
+    the IEEE 754 standard's binary128, it will be represented by its raw bytes.
+    """
+
     ZERO = b'\x00' * 16
 
     def __init__(self, value: bytes = None, id: int = ILTAG_BINARY128_ID) -> None:
@@ -271,13 +320,18 @@ class ILBinary128Tag(ILFixedSizeTag):
 
 
 class ILByteArrayTag(ILRawTag):
+    """
+    This class implements the tag ILTAG_BYTE_ARRAY_ID.
+    """
+
     def __init__(self, value: bytes = None, id: int = ILTAG_BYTE_ARRAY_ID) -> None:
         super().__init__(id, value)
 
 
 class ILStringTag(ILTag):
     """
-    This class implements the tag ILTAG_STRING_ID.
+    This class implements the tag ILTAG_STRING_ID. It also include a few helper functions 
+    to better manupulate UTF-8 bytes directly.
     """
 
     def __init__(self, value: str = None, id: int = ILTAG_STRING_ID) -> None:
@@ -343,7 +397,9 @@ class ILStringTag(ILTag):
 
 
 class ILBigIntegerTag(ILRawTag):
-
+    """
+    This class implements the tag ILTAG_BINT_ID.
+    """
     DEFAULT_VALUE = b'\x00'
 
     def __init__(self, value: bytes = None, id: int = ILTAG_BINT_ID) -> None:
@@ -355,6 +411,10 @@ class ILBigIntegerTag(ILRawTag):
 
 
 class ILBigDecimalTag(ILBigIntegerTag):
+    """
+    This class implements the tag ILTAG_BDEC_ID.
+    """
+
     def __init__(self, value: bytes = None, scale: int = 0, id: int = ILTAG_BDEC_ID) -> None:
         super().__init__(value, id)
         self.scale = scale
@@ -385,6 +445,9 @@ class ILBigDecimalTag(ILBigIntegerTag):
 
 
 class ILIntArrayTag(ILTag):
+    """
+    This class implements the tag ILTAG_ILINT64_ARRAY_ID.
+    """
 
     def __init__(self, id: int = ILTAG_ILINT64_ARRAY_ID) -> None:
         super().__init__(id)
@@ -420,6 +483,9 @@ class ILIntArrayTag(ILTag):
 
 
 class ILTagArrayTag(ILTag):
+    """
+    This class implements the tag ILTAG_ILTAG_ARRAY_ID.
+    """
 
     def __init__(self, id: int = ILTAG_ILTAG_ARRAY_ID) -> None:
         super().__init__(id)
@@ -454,6 +520,9 @@ class ILTagArrayTag(ILTag):
 
 
 class ILTagSequenceTag(ILTag):
+    """
+    This class implements the tag ILTAG_ILTAG_SEQ_ID.
+    """
 
     def __init__(self, id: int = ILTAG_ILTAG_SEQ_ID) -> None:
         super().__init__(id)
@@ -486,6 +555,9 @@ class ILTagSequenceTag(ILTag):
 
 
 class ILRangeTag(ILTag):
+    """
+    This class implements the tag ILTAG_RANGE_ID.
+    """
 
     def __init__(self, first: int = 0, count: int = 0, id: int = ILTAG_RANGE_ID) -> None:
         super().__init__(id)
@@ -532,6 +604,9 @@ class ILRangeTag(ILTag):
 
 
 class ILVersionTag(ILTag):
+    """
+    This class implements the tag ILTAG_VERSION_ID.
+    """
 
     def __init__(self, major: int = 0, minor: int = 0, revision: int = 0, build: int = 0, id: int = ILTAG_VERSION_ID) -> None:
         super().__init__(id)
@@ -594,11 +669,18 @@ class ILVersionTag(ILTag):
 
 
 class ILOIDTag(ILIntArrayTag):
+    """
+    This class implements the tag ILTAG_OID_ID.
+    """
+
     def __init__(self) -> None:
         super().__init__(ILTAG_OID_ID)
 
 
 class ILDictionaryTag(ILTag):
+    """
+    This class implements the tag ILTAG_DICT_ID.
+    """
 
     def __init__(self, id: int = ILTAG_DICT_ID) -> None:
         super().__init__(id)
@@ -639,6 +721,9 @@ class ILDictionaryTag(ILTag):
 
 
 class ILStringDictionaryTag(ILTag):
+    """
+    This class implements the tag ILTAG_STRDICT_ID.
+    """
 
     def __init__(self, id: int = ILTAG_STRDICT_ID) -> None:
         super().__init__(id)
