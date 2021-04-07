@@ -120,7 +120,6 @@ class TestILTag(unittest.TestCase):
             size = ilint_size(id) + id
             self.assertEqual(t.tag_size(), size)
             t.value_size.assert_called_once()
-            self.assertEqual(len(t), size)
 
         for id in [16, 256, 1231231]:
             t = ILTag(id)
@@ -128,7 +127,6 @@ class TestILTag(unittest.TestCase):
             size = ilint_size(id) + ilint_size(id) + id
             self.assertEqual(t.tag_size(), size)
             t.value_size.assert_called_once()
-            self.assertEqual(len(t), size)
 
     def test_deserialize_value(self):
         t = ILTag(123)

@@ -158,13 +158,6 @@ class ILTag:
             size += pyilint.ilint_size(value_size)
         return size
 
-    def __len__(self) -> int:
-        """
-        Returns the size of the tag in bytes (for `len()`). It is the
-        same as `tag_size()`.
-        """
-        return self.tag_size()
-
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         """
         Deserializes the value of this class.
