@@ -249,12 +249,11 @@ class ILBinary64Tag(ILBaseFloatTag):
 
 
 class ILBinary128Tag(ILFixedSizeTag):
+    ZERO = b'\x00' * 16
+
     def __init__(self, value: bytes = None, id: int = ILTAG_BINARY128_ID) -> None:
         super().__init__(id, 16, True)
-        if value is None:
-            self.value = b'\x00' * 16
-        else:
-            self.value = value
+        self.value = value
 
     @property
     def value(self) -> bytes:
@@ -262,14 +261,26 @@ class ILBinary128Tag(ILFixedSizeTag):
 
     @value.setter
     def value(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != 16:
+        if value is None:
+            v = ILBinary128Tag.ZERO
+        elif isinstance(value, bytearray):
+            v = bytes(value)
+        elif isinstance(value, bytes):
+            v = value
+        else:
             raise TypeError(
                 'The value must be an instance of bytes with 16 positions.')
-        self._value = value
+        if len(v) != 16:
+            raise TypeError(
+                'The value must be an instance of bytes with 16 positions.')
+        self._value = v
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < 16:
             raise EOFError('Unable to read the value of the tag.')
+        if tag_size > 16:
+            raise ILTagCorruptedError(
+                'Tag too long. Expecting 16 bytes but got {tag_size}.')
         self.value = read_bytes(16, reader)
 
     def serialize_value(self, writer: io.IOBase) -> None:

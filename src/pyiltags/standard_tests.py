@@ -307,6 +307,90 @@ class TestILILInt64Tag(unittest.TestCase):
             self.assertEqual(val, writer.read())
 
 
+class TestILBinary32_64Tag(unittest.TestCase):
+
+    def constructor_core(self, tag_class, id: int, size: int):
+        t = tag_class()
+        self.assertEqual(id, t.id)
+        self.assertEqual(0.0, t.value)
+        self.assertEqual(size, t.value_size())
+
+        t = tag_class(1.0)
+        self.assertEqual(id, t.id)
+        self.assertEqual(1.0, t.value)
+        self.assertEqual(size, t.value_size())
+
+        t = tag_class(1.0, 1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(1.0, t.value)
+        self.assertEqual(size, t.value_size())
+
+    def test_constructor(self):
+        self.constructor_core(ILBinary32Tag, ILTAG_BINARY32_ID, 4)
+        self.constructor_core(ILBinary64Tag, ILTAG_BINARY64_ID, 8)
+
+
+class TestILBinary128Tag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILBinary128Tag()
+        self.assertEqual(ILTAG_BINARY128_ID, t.id)
+        self.assertEqual(b'\x00' * 16, t.value)
+        self.assertEqual(16, t.value_size())
+
+        t = ILBinary128Tag(None)
+        self.assertEqual(ILTAG_BINARY128_ID, t.id)
+        self.assertEqual(b'\x00' * 16, t.value)
+        self.assertEqual(16, t.value_size())
+
+        t = ILBinary128Tag(b'\x01' * 16)
+        self.assertEqual(ILTAG_BINARY128_ID, t.id)
+        self.assertEqual(b'\x01' * 16, t.value)
+        self.assertEqual(16, t.value_size())
+
+        t = ILBinary128Tag(b'\x01' * 16, 1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(b'\x01' * 16, t.value)
+        self.assertEqual(16, t.value_size())
+
+    def test_value(self):
+        t = ILBinary128Tag()
+
+        v = b'\x12' * 16
+        t.value = v
+        self.assertEqual(v, t.value)
+
+        v = b'\x12' * 16
+        t.value = bytearray(v)
+        self.assertEqual(v, t.value)
+
+        t.value = None
+        self.assertEqual(b'\x00' * 16, t.value)
+
+        for v in [1, 1.0, '1', b'\x00' * 15, b'\x00' * 17]:
+            with self.assertRaises(TypeError):
+                t.value = v
+
+    def test_deserialize_value(self):
+        t = ILBinary128Tag()
+        exp = b'\x12' * 16
+        reader = io.BytesIO(exp + exp)
+        t.deserialize_value(None, 16, reader)
+        self.assertEqual(exp, t.value)
+        self.assertRaises(EOFError, t.deserialize_value, None, 15, reader)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 17, reader)
+
+    def test_serialize_value(self):
+        exp = b'\x12' * 16
+        t = ILBinary128Tag(exp)
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(16, writer.tell())
+        writer.seek(0)
+        self.assertEqual(exp, writer.read())
+
+
 class TestILByteArrayTag(unittest.TestCase):
 
     def test_constructor(self):
