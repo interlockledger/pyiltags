@@ -302,7 +302,7 @@ class ILStringTag(ILTag):
         Creates a new instance of this class.
 
         Parameters:
-        - `value`: The value of the tag. Must be a string or None;
+        - `value`: The value of the tag. Must be a string or None. None is equivalent to '';
         - `id`: The id if necessary.
         """
         super().__init__(id)
@@ -314,9 +314,9 @@ class ILStringTag(ILTag):
 
     @value.setter
     def value(self, value: str):
-        if value is None:
-            self._value = None
-            self._utf8 = None
+        if value is None or value == '':
+            self._value = ''
+            self._utf8 = b''
         elif isinstance(value, str):
             self._value = value
             self._utf8 = codecs.encode(value, 'utf-8')
@@ -324,20 +324,17 @@ class ILStringTag(ILTag):
             raise TypeError('The value must be a str.')
 
     def value_size(self) -> int:
-        if self.utf8 is None:
-            return 0
-        else:
-            return len(self.utf8)
+        return len(self.utf8)
 
     @property
     def utf8(self) -> bytes:
-        return self.utf8
+        return self._utf8
 
     @utf8.setter
     def utf8(self, utf8: bytes):
-        if utf8 is None:
-            self._value = None
-            self._utf8 = None
+        if utf8 is None or utf8 == b'':
+            self._value = ''
+            self._utf8 = b''
         elif isinstance(utf8, bytes):
             self._value = codecs.decode(utf8, 'utf-8')
             if isinstance(utf8, bytearray):
@@ -349,13 +346,17 @@ class ILStringTag(ILTag):
                 'The value must be an instance of bytes or bytearray.')
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        try:
-            self.utf8 = read_bytes(tag_size, reader)
-        except ValueError:
-            raise ILTagCorruptedError('Corrupted utf-8 string.')
+        if tag_size == 0:
+            self.utf8 = None
+        else:
+            try:
+                self.utf8 = read_bytes(tag_size, reader)
+            except ValueError:
+                raise ILTagCorruptedError('Corrupted utf-8 string.')
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        writer.write(self.utf8)
+        if self.utf8 is not None:
+            writer.write(self.utf8)
 
 
 class ILBigIntegerTag(ILRawTag):

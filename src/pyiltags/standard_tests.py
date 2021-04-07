@@ -406,3 +406,115 @@ class TestILByteArrayTag(unittest.TestCase):
         t = ILByteArrayTag(paylod, 1234)
         self.assertEqual(1234, t.id)
         self.assertEqual(paylod, t.value)
+
+
+class TestILStringTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILStringTag()
+        self.assertEqual(ILTAG_STRING_ID, t.id)
+        self.assertEqual('', t.value)
+        self.assertEqual(b'', t.utf8)
+
+        t = ILStringTag('abc')
+        self.assertEqual(ILTAG_STRING_ID, t.id)
+        self.assertEqual('abc', t.value)
+        self.assertEqual(b'abc', t.utf8)
+
+        t = ILStringTag('abc', 1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual('abc', t.value)
+        self.assertEqual(b'abc', t.utf8)
+
+    def test_value(self):
+        t = ILStringTag()
+
+        sample = 'Blade Runner - O Caçador de Andróides'
+        sample_utf8 = codecs.encode(sample, 'utf-8')
+        t.value = sample
+        self.assertEqual(sample, t.value)
+        self.assertEqual(sample_utf8, t.utf8)
+
+        t.value = None
+        self.assertEqual('', t.value)
+        self.assertEqual(b'', t.utf8)
+
+        for v in [1, 1.0, [], b'123']:
+            with self.assertRaises(TypeError):
+                t.value = v
+
+    def test_utf8(self):
+        t = ILStringTag()
+
+        sample = 'Blade Runner - O Caçador de Andróides'
+        sample_utf8 = codecs.encode(sample, 'utf-8')
+        t.utf8 = sample_utf8
+        self.assertEqual(sample, t.value)
+        self.assertEqual(sample_utf8, t.utf8)
+
+        t.utf8 = None
+        self.assertEqual('', t.value)
+        self.assertEqual(b'', t.utf8)
+
+        with self.assertRaises(ValueError):
+            t.utf8 = b'\xF0\x90\x8D'
+        self.assertEqual('', t.value)
+        self.assertEqual(b'', t.utf8)
+
+        for v in [1, 1.0, []]:
+            with self.assertRaises(TypeError):
+                t.utf8 = v
+
+    def test_value_size(self):
+        t = ILStringTag()
+
+        self.assertEqual(0, t.value_size())
+
+        sample = 'Blade Runner - O Caçador de Andróides'
+        sample_utf8 = codecs.encode(sample, 'utf-8')
+        t.value = sample
+        self.assertEqual(len(sample_utf8), t.value_size())
+
+    def test_deserialize_value(self):
+        t = ILStringTag()
+
+        sample = 'Blade Runner - O Caçador de Andróides'
+        sample_utf8 = codecs.encode(sample, 'utf-8')
+
+        reader = io.BytesIO(sample_utf8)
+        t.deserialize_value(None, len(sample_utf8), reader)
+        self.assertEqual(len(sample_utf8), reader.tell())
+        self.assertEqual(sample, t.value)
+        self.assertEqual(sample_utf8, t.utf8)
+
+        reader = io.BytesIO(sample_utf8)
+        t.deserialize_value(None, len(sample_utf8), reader)
+        self.assertEqual(len(sample_utf8), reader.tell())
+        self.assertEqual(sample, t.value)
+        self.assertEqual(sample_utf8, t.utf8)
+
+        reader = io.BytesIO()
+        t.deserialize_value(None, 0, reader)
+        self.assertEqual(0, reader.tell())
+        self.assertEqual('', t.value)
+        self.assertEqual(b'', t.utf8)
+
+        self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                          None, 3, io.BytesIO(b'\xF0\x90\x8D'))
+
+    def test_serialize_value(self):
+        t = ILStringTag()
+
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(0, writer.tell())
+
+        sample = 'Blade Runner - O Caçador de Andróides'
+        sample_utf8 = codecs.encode(sample, 'utf-8')
+
+        t.value = sample
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(len(sample_utf8), writer.tell())
+        writer.seek(0)
+        self.assertEqual(sample_utf8, writer.read())
