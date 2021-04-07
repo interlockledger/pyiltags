@@ -298,12 +298,12 @@ class TestILFixedSizeTag(unittest.TestCase):
 
     def test_constructor(self):
         t = ILFixedSizeTag(0, 0, True)
-        self.assertEquals(0, t.id)
-        self.assertEquals(0, t.value_size())
+        self.assertEqual(0, t.id)
+        self.assertEqual(0, t.value_size())
 
         t = ILFixedSizeTag(16, 12)
-        self.assertEquals(16, t.id)
-        self.assertEquals(12, t.value_size())
+        self.assertEqual(16, t.id)
+        self.assertEqual(12, t.value_size())
 
 
 class TestILBaseIntTag(unittest.TestCase):
