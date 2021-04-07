@@ -383,6 +383,8 @@ class ILBigDecimalTag(ILBigIntegerTag):
 
     @scale.setter
     def scale(self, scale: int):
+        if not isinstance(scale, int):
+            raise TypeError('The scale must be a valid integer.')
         assert_int_bounds(scale, 4, True)
         self._scale = scale
 
@@ -390,6 +392,8 @@ class ILBigDecimalTag(ILBigIntegerTag):
         return 4 + len(self.value)
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        if tag_size < 5:
+            raise ILTagCorruptedError('Corrupted tag value.')
         self.scale = read_int(4, True, reader)
         self.value = read_bytes(tag_size - 4, reader)
 

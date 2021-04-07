@@ -549,3 +549,88 @@ class TestILBigDecimalTag(unittest.TestCase):
 
     def test_constructor(self):
         t = ILBigDecimalTag()
+        self.assertEqual(ILTAG_BDEC_ID, t.id)
+        self.assertEqual(b'\0', t.value)
+        self.assertEqual(0, t.scale)
+
+        t = ILBigDecimalTag(b'1234')
+        self.assertEqual(ILTAG_BDEC_ID, t.id)
+        self.assertEqual(b'1234', t.value)
+        self.assertEqual(0, t.scale)
+
+        t = ILBigDecimalTag(b'1234', -10)
+        self.assertEqual(ILTAG_BDEC_ID, t.id)
+        self.assertEqual(b'1234', t.value)
+        self.assertEqual(-10, t.scale)
+
+        t = ILBigDecimalTag(b'1234', -10, 123456)
+        self.assertEqual(123456, t.id)
+        self.assertEqual(b'1234', t.value)
+        self.assertEqual(-10, t.scale)
+
+    def test_scale(self):
+        t = ILBigDecimalTag()
+
+        t.scale = -(2**31)
+        self.assertEqual(-(2**31), t.scale)
+        t.scale = 2**31 - 1
+        self.assertEqual(2**31 - 1, t.scale)
+
+        t.scale = 1
+        for v in [1.0, [], '123']:
+            with self.assertRaises(TypeError):
+                t.scale = v
+            self.assertEqual(1, t.scale)
+
+        for v in [-(2**31 + 1), 2**31]:
+            with self.assertRaises(ValueError):
+                t.scale = v
+            self.assertEqual(1, t.scale)
+
+    def test_value_size(self):
+        t = ILBigDecimalTag()
+        self.assertEqual(4 + 1, t.value_size())
+
+        t = ILBigDecimalTag(b'123456')
+        self.assertEqual(4 + 6, t.value_size())
+
+    def test_deserialize_value(self):
+        t = ILBigDecimalTag()
+
+        reader = io.BytesIO()
+        write_int(-123, 4, True, reader)
+        reader.write(b'123456789')
+        tag_size = reader.tell()
+
+        reader.seek(0)
+        t.deserialize_value(None, tag_size, reader)
+        self.assertEqual(-123, t.scale)
+        self.assertEqual(b'123456789', t.value)
+
+        reader.seek(0)
+        t.deserialize_value(None, 5, reader)
+        self.assertEqual(-123, t.scale)
+        self.assertEqual(b'1', t.value)
+
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, 4, reader)
+        self.assertRaises(EOFError,
+                          t.deserialize_value, None, tag_size+1, reader)
+
+    def test_serialize_value(self):
+
+        scale = -123
+        value = b'123456789'
+
+        exp = io.BytesIO()
+        write_int(scale, 4, True, exp)
+        exp.write(value)
+        tag_size = exp.tell()
+
+        t = ILBigDecimalTag(value, scale)
+        writer = io.BytesIO()
+        t.serialize_value(writer)
+        self.assertEqual(exp.tell(), writer.tell())
+        exp.seek(0)
+        writer.seek(0)
+        self.assertEqual(exp.read(), writer.read())
