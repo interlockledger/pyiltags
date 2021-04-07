@@ -189,7 +189,7 @@ class ILRawTag(ILTag):
     implementation for any explicit tag.
     """
 
-    def __init__(self, id: int, payload: bytes = None) -> None:
+    def __init__(self, id: int, value: bytes = None) -> None:
         """
         Creates a new instance of this tag.
 
@@ -200,20 +200,35 @@ class ILRawTag(ILTag):
         super().__init__(id)
         if self.implicit:
             raise ValueError('Implicity tags cannot be by this class.')
-        self.payload = payload
+        self.value = value
+
+    @property
+    def value(self) -> bytes:
+        return self._value
+
+    @value.setter
+    def value(self, value: bytes):
+        if value is None:
+            self._value = None
+        elif isinstance(value, bytearray):
+            self._value = bytes(value)
+        elif isinstance(value, bytes):
+            self._value = value
+        else:
+            raise TypeError('The payload must ')
 
     def value_size(self) -> int:
-        if self.payload is not None:
-            return len(self.payload)
+        if self.value is not None:
+            return len(self.value)
         else:
             return 0
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        self.payload = read_bytes(tag_size, reader)
+        self.value = read_bytes(tag_size, reader)
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        if self.payload is not None:
-            writer.write(self.payload)
+        if self.value is not None:
+            writer.write(self.value)
 
 
 class ILFixedSizeTag(ILTag):

@@ -188,19 +188,35 @@ class TestILRawTag(unittest.TestCase):
         self.assertRaises(ValueError, ILRawTag, 15, None)
         self.assertRaises(ValueError, ILRawTag, 0, b'1234')
 
+    def test_constructor(self):
+        t = ILRawTag(16)
+
+        t.value = b'1234'
+        self.assertEqual(b'1234', t.value)
+
+        t.value = bytearray(b'1234')
+        self.assertEqual(b'1234', t.value)
+
+        t.value = None
+        self.assertIsNone(t.value)
+
+        for v in ['', '1234', 1, 1.0, []]:
+            with self.assertRaises(TypeError):
+                t.value = v
+
     def test_deserialize_value(self):
         t = ILRawTag(16)
         reader = io.BytesIO(b'1234')
         t.deserialize_value(None, 0, reader)
         self.assertEqual(0, reader.tell())
-        self.assertEqual(b'', t.payload)
+        self.assertEqual(b'', t.value)
         self.assertEqual(0, t.value_size())
 
         t = ILRawTag(16)
         reader = io.BytesIO(b'1234')
         t.deserialize_value(None, 3, reader)
         self.assertEqual(3, reader.tell())
-        self.assertEqual(b'123', t.payload)
+        self.assertEqual(b'123', t.value)
         self.assertEqual(3, t.value_size())
 
         t = ILRawTag(16)
