@@ -199,7 +199,7 @@ class ILILInt64Tag(ILTag):
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         """
         This method behaves a little different if the tag is implicit or explicit. In the implicit
-        case, the tag_size cannot be discovered without looking into the value itself. Thus, it is 
+        case, the tag_size cannot be discovered without looking into the value itself. Thus, it is
         necessary to set tag_size to any value from 1 to 9. The actual tag_size will be discovered during the
         deserialization. If the tag is explicit, the tag_size must match the actual ILInt size, otherwise the
         deserialization will fail.
@@ -262,18 +262,19 @@ class ILBinary128Tag(ILFixedSizeTag):
     @value.setter
     def value(self, value: bytes):
         if value is None:
-            v = ILBinary128Tag.ZERO
-        elif isinstance(value, bytearray):
-            v = bytes(value)
-        elif isinstance(value, bytes):
-            v = value
+            self._value = ILBinary128Tag.ZERO
         else:
-            raise TypeError(
-                'The value must be an instance of bytes with 16 positions.')
-        if len(v) != 16:
-            raise TypeError(
-                'The value must be an instance of bytes with 16 positions.')
-        self._value = v
+            if isinstance(value, bytearray):
+                v = bytes(value)
+            elif isinstance(value, bytes):
+                v = value
+            else:
+                raise TypeError(
+                    'The value must be an instance of bytes with 16 positions.')
+            if len(v) != 16:
+                raise TypeError(
+                    'The value must be an instance of bytes with 16 positions.')
+            self._value = v
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < 16:
