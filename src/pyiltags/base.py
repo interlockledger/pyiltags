@@ -51,6 +51,11 @@ class ILTagCorruptedError(ILTagError):
         super().__init__(*args)
 
 
+class ILTagUnknownError(ILTagError):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+
+
 def iltags_assert_valid_id(id: int) -> None:
     """
     Asserts that the id is a valid ILTag id. Raises
