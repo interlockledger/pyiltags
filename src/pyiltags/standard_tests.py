@@ -518,3 +518,34 @@ class TestILStringTag(unittest.TestCase):
         self.assertEqual(len(sample_utf8), writer.tell())
         writer.seek(0)
         self.assertEqual(sample_utf8, writer.read())
+
+
+class TestILBigIntegerTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILBigIntegerTag()
+        self.assertEqual(ILTAG_BINT_ID, t.id)
+        self.assertEqual(b'\x00', t.value)
+
+        t = ILBigIntegerTag(b'12345')
+        self.assertEqual(ILTAG_BINT_ID, t.id)
+        self.assertEqual(b'12345', t.value)
+
+        t = ILBigIntegerTag(b'12345', 123)
+        self.assertEqual(123, t.id)
+        self.assertEqual(b'12345', t.value)
+
+    def test_default(self):
+        t = ILBigIntegerTag()
+        self.assertEqual(b'\x00', t.default_value)
+
+    def test_assert_value_valid(self):
+        t = ILBigIntegerTag()
+        t.assert_value_valid(b'\x00')
+        self.assertRaises(ValueError, t.assert_value_valid, b'')
+
+
+class TestILBigDecimalTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILBigDecimalTag()

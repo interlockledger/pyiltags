@@ -360,25 +360,21 @@ class ILStringTag(ILTag):
 
 
 class ILBigIntegerTag(ILRawTag):
+
+    DEFAULT_VALUE = b'\x00'
+
     def __init__(self, value: bytes = None, id: int = ILTAG_BINT_ID) -> None:
         super().__init__(id, value)
 
+    def assert_value_valid(self, value: bytes):
+        if len(value) == 0:
+            raise ValueError('The value must have at least 1 byte.')
 
-class ILBigDecimalTag(ILTag):
+
+class ILBigDecimalTag(ILBigIntegerTag):
     def __init__(self, value: bytes = None, scale: int = 0, id: int = ILTAG_BDEC_ID) -> None:
-        super().__init__(id)
+        super().__init__(value, id)
         self.scale = scale
-        self.value = value
-
-    @property
-    def value(self) -> bytes:
-        return self._value
-
-    @value.setter
-    def value(self, value: bytes):
-        if not isinstance(value, bytes):
-            raise TypeError('Value must be an instance of bytes.')
-        self._value = value
 
     @property
     def scale(self) -> int:
