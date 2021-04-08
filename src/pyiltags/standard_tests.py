@@ -31,6 +31,7 @@
 from typing import Callable
 import codecs
 import unittest
+import random
 from .standard import *
 
 # Text example extracted from O Alienista by Machado de Assis.
@@ -700,3 +701,71 @@ class TestILBigDecimalTag(unittest.TestCase):
         exp.seek(0)
         writer.seek(0)
         self.assertEqual(exp.read(), writer.read())
+
+
+class TestILIntArrayTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILIntArrayTag()
+        self.assertEqual(ILTAG_ILINT64_ARRAY_ID, t.id)
+        self.assertEqual(0, len(t))
+
+        t = ILIntArrayTag(1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(0, len(t))
+
+    def test_assert_value_type(self):
+        t = ILIntArrayTag()
+
+        t.assert_value_type(0)
+        t.assert_value_type(2**64 - 1)
+        self.assertRaises(ValueError, t.assert_value_type, -1)
+        self.assertRaises(ValueError, t.assert_value_type, 2**64)
+        self.assertRaises(TypeError, t.assert_value_type, '')
+        self.assertRaises(TypeError, t.assert_value_type, 1.0)
+
+    def test_value_size(self):
+        t = ILIntArrayTag()
+        self.assertEqual(1, t.value_size())
+        for count in range(256):
+            t.append(random.randrange(0, 2**64))
+            exp = pyilint.ilint_size(len(t))
+            for v in t:
+                exp += pyilint.ilint_size(v)
+            self.assertEqual(exp, t.value_size())
+
+    def test_deserialize_value(self):
+        values = []
+        for _ in range(0, 256, 8):
+            values.append(random.randrange(0, 2**64))
+            reader = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(values), reader)
+            for v in values:
+                pyilint.ilint_encode_to_stream(v, reader)
+            tag_size = reader.tell()
+            reader.seek(0)
+            t = ILIntArrayTag()
+            t.deserialize_value(None, tag_size, reader)
+            self.assertEqual(tag_size, reader.tell())
+            self.assertEqual(len(values), len(t))
+            for i in range(len(t)):
+                self.assertEqual(values[i], t[i])
+
+    def test_serialize_value(self):
+        values = []
+        for _ in range(0, 256, 8):
+            values.append(random.randrange(0, 2**64))
+            reader = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(values), reader)
+            for v in values:
+                pyilint.ilint_encode_to_stream(v, reader)
+
+            t = ILIntArrayTag()
+            for v in values:
+                t.append(v)
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(reader.tell(), writer.tell())
+            reader.seek(0)
+            writer.seek(0)
+            self.assertEqual(reader.read(), writer.read())

@@ -501,6 +501,7 @@ class ILIntArrayTag(ILTag, RestrictListMixin[int]):
 
     def __init__(self, id: int = ILTAG_ILINT64_ARRAY_ID) -> None:
         super().__init__(id)
+        RestrictListMixin.__init__(self)
 
     def assert_value_type(self, value: T):
         if isinstance(value, int):
@@ -518,9 +519,9 @@ class ILIntArrayTag(ILTag, RestrictListMixin[int]):
         if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
         self.clear()
-        count, = pyilint.ilint_decode_from_stream(reader)
+        count, _ = pyilint.ilint_decode_from_stream(reader)
         for i in range(count):
-            v, = pyilint.ilint_decode_from_stream(reader)
+            v, _ = pyilint.ilint_decode_from_stream(reader)
             self.append(v)
 
     def serialize_value(self, writer: io.IOBase) -> None:
@@ -536,6 +537,7 @@ class ILTagArrayTag(ILTag, RestrictListMixin[ILTag]):
 
     def __init__(self, id: int = ILTAG_ILTAG_ARRAY_ID) -> None:
         super().__init__(id)
+        RestrictListMixin.__init__(self)
 
     def assert_value_type(self, value: T):
         if not isinstance(value, ILTag):
@@ -569,6 +571,7 @@ class ILTagSequenceTag(ILTag, RestrictListMixin[ILTag]):
 
     def __init__(self, id: int = ILTAG_ILTAG_SEQ_ID) -> None:
         super().__init__(id)
+        RestrictListMixin.__init__(self)
 
     def assert_value_type(self, value: T):
         if not isinstance(value, ILTag):
@@ -718,11 +721,14 @@ class ILOIDTag(ILIntArrayTag):
 
 class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
     """
-    This class implements the tag ILTAG_DICT_ID.
+    This class implements the tag ILTAG_DICT_ID. Instances of this 
+    class implements a dictionary interface that accepts strings as
+    keys and ILTags as values. It also preserves the order of insertion.
     """
 
     def __init__(self, id: int = ILTAG_DICT_ID) -> None:
         super().__init__(id)
+        RestrictDictMixin.__init__(self)
 
     def assert_value_type(self, value: T):
         if not isinstance(value, ILTag):
@@ -761,12 +767,14 @@ class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
 
 class ILStringDictionaryTag(ILTag, RestrictDictMixin[str, str]):
     """
-    This class implements the tag ILTAG_STRDICT_ID.
+    This class implements the tag ILTAG_STRDICT_ID. Instances of this 
+    class implements a dictionary interface that accepts strings as
+    keys and ILTags as values. It also preserves the order of insertion.
     """
 
     def __init__(self, id: int = ILTAG_STRDICT_ID) -> None:
         super().__init__(id)
-        self._values = []
+        RestrictDictMixin.__init__(self)
 
     def assert_value_type(self, value: T):
         if not isinstance(value, str):

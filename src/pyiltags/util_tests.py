@@ -127,9 +127,15 @@ class TestUtil(unittest.TestCase):
 class TestRestrictListMixin(unittest.TestCase):
 
     class A:
-        pass
+        def __init__(self) -> None:
+            pass
 
     class ExampleRestrictListMixin(A, RestrictListMixin):
+
+        def __init__(self) -> None:
+            super().__init__()
+            RestrictListMixin.__init__(self)
+
         def assert_value_type(self, value: T):
             if not isinstance(value, int):
                 raise TypeError('Only integers are allowed.')
@@ -252,9 +258,15 @@ class TestRestrictListMixin(unittest.TestCase):
 class TestRestrictDictMixin(unittest.TestCase):
 
     class A:
-        pass
+        def __init__(self) -> None:
+            pass
 
     class StrIntRestrictDictMixin(A, RestrictDictMixin):
+
+        def __init__(self) -> None:
+            super().__init__()
+            RestrictDictMixin.__init__(self)
+
         def assert_value_type(self, value: T):
             if not isinstance(value, int):
                 raise TypeError()
