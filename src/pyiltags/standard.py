@@ -357,7 +357,7 @@ class ILStringTag(ILTag):
             self._utf8 = b''
         elif isinstance(value, str):
             self._value = value
-            self._utf8 = codecs.encode(value, 'utf-8')
+            self._utf8 = ILStringTag.to_utf8(value)
         else:
             raise TypeError('The value must be a str.')
 
@@ -374,7 +374,7 @@ class ILStringTag(ILTag):
             self._value = ''
             self._utf8 = b''
         elif isinstance(utf8, bytes):
-            self._value = codecs.decode(utf8, 'utf-8')
+            self._value = ILStringTag.from_utf8(utf8)
             if isinstance(utf8, bytearray):
                 self._utf8 = bytes(utf8)
             else:
@@ -395,6 +395,57 @@ class ILStringTag(ILTag):
     def serialize_value(self, writer: io.IOBase) -> None:
         if self.utf8 is not None:
             writer.write(self.utf8)
+
+    @staticmethod
+    def to_utf8(s: str) -> bytes:
+        """
+        Converts a string into its UTF-8 bytes.
+        """
+        return s.encode('utf-8')
+
+    @staticmethod
+    def from_utf8(utf8: bytes) -> str:
+        """
+        Converts UTF-8 bytes into a string. It may raise a `ValueError`
+        if `utf8` is not a valid UTF-8 string.
+        """
+        return str(utf8, 'utf-8')
+
+    @staticmethod
+    def size_in_utf8(s: str) -> int:
+        """
+        Computes of the string encoded in UTF-8.
+        """
+        return len(s.encode('utf-8'))
+
+    @staticmethod
+    def compute_string_tag_size(value: str, id: id = ILTAG_STRING_ID) -> int:
+        """
+        Computes the size of a ILStringTag like tag based on its value.
+        """
+        return ILTag.compute_tag_size(id, ILStringTag.size_in_utf8(value))
+
+    @staticmethod
+    def serialize_tag_from_components(value: str, writer: io.IOBase,
+                                      id: id = ILTAG_STRING_ID) -> int:
+        """
+        Serializes `ILStringTag` like tag without the need to create a new
+        instance of ILStringTag. This method was devised as a way to avoid
+        unnecessary allocation of `ILStringTags` whenever possible.
+
+        Parameters:
+        - `str`: The string to be serialized.
+        - `writer`: The writer that will receive the tag.
+        - `id`: Alternative tag id if it is not ILTAG_STRING_ID;
+        """
+        if isinstance(value, str):
+            bin_value = ILStringTag.to_utf8(value)
+        else:
+            bin_value = value
+        size = pyilint.ilint_encode_to_stream(id, writer)
+        size += pyilint.ilint_encode_to_stream(len(bin_value), writer)
+        writer.write(bin_value)
+        return size + len(bin_value)
 
 
 class ILBigIntegerTag(ILRawTag):

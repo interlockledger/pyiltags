@@ -32,6 +32,15 @@ from typing import Callable
 import unittest
 from .standard import *
 
+# Text example extracted from O Alienista by Machado de Assis.
+STRING_SAMPLES = """
+As crônicas da vila de Itaguaí dizem que em tempos remotos vivera ali um certo
+médico, o Dr. Simão Bacamarte, filho da nobreza da terra e o maior dos médicos
+do Brasil, de Portugal e das Espanhas. Estudara em Coimbra e Pádua. Aos trinta
+e quatro anos regressou ao Brasil, não podendo el-rei alcançar dele que ficasse
+em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios da monarquia.
+""".split()
+
 
 class TestILTagIds(unittest.TestCase):
 
@@ -518,6 +527,62 @@ class TestILStringTag(unittest.TestCase):
         self.assertEqual(len(sample_utf8), writer.tell())
         writer.seek(0)
         self.assertEqual(sample_utf8, writer.read())
+
+    def test_to_utf8(self):
+        for s in STRING_SAMPLES:
+            utf8 = ILStringTag.to_utf8(s)
+            exp = codecs.encode(s, 'utf-8')
+            self.assertEqual(exp, utf8)
+
+    def test_from_utf8(self):
+        for s in STRING_SAMPLES:
+            self.assertEqual(s, ILStringTag.from_utf8(
+                codecs.encode(s, 'utf-8')))
+            self.assertEqual(s, ILStringTag.from_utf8(
+                ILStringTag.to_utf8(s)))
+
+    def test_size_in_utf8(self):
+        for s in STRING_SAMPLES:
+            exp = codecs.encode(s, 'utf-8')
+            self.assertEqual(len(exp), ILStringTag.size_in_utf8(s))
+
+    def test_compute_string_tag_size(self):
+        for s in STRING_SAMPLES:
+            t = ILStringTag(s)
+            self.assertEqual(
+                t.tag_size(), ILStringTag.compute_string_tag_size(s))
+
+        for s in STRING_SAMPLES:
+            t = ILStringTag(s, 0xFFFFFFFF)
+            self.assertEqual(
+                t.tag_size(), ILStringTag.compute_string_tag_size(s, 0xFFFFFFFF))
+
+    def test_serialize_tag_from_components(self):
+
+        for s in STRING_SAMPLES:
+            t = ILStringTag(s)
+            exp = io.BytesIO()
+            t.serialize(exp)
+            writer = io.BytesIO()
+            size = ILStringTag.serialize_tag_from_components(s, writer)
+            self.assertEqual(size, writer.tell())
+            self.assertEqual(exp.tell(), writer.tell())
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
+
+        alt_id = 0xFFFFFFFF
+        for s in STRING_SAMPLES:
+            t = ILStringTag(s, alt_id)
+            exp = io.BytesIO()
+            t.serialize(exp)
+            writer = io.BytesIO()
+            size = ILStringTag.serialize_tag_from_components(s, writer, alt_id)
+            self.assertEqual(size, writer.tell())
+            self.assertEqual(exp.tell(), writer.tell())
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
 
 
 class TestILBigIntegerTag(unittest.TestCase):
