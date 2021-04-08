@@ -499,9 +499,12 @@ class ILIntArrayTag(ILTag, RestrictListMixin[int]):
     This class implements the tag ILTAG_ILINT64_ARRAY_ID.
     """
 
-    def __init__(self, id: int = ILTAG_ILINT64_ARRAY_ID) -> None:
+    def __init__(self, values: List[int] = None, id: int = ILTAG_ILINT64_ARRAY_ID) -> None:
         super().__init__(id)
         RestrictListMixin.__init__(self)
+        if values:
+            for v in values:
+                self.append(v)
 
     def assert_value_type(self, value: T):
         if isinstance(value, int):
@@ -645,13 +648,13 @@ class ILRangeTag(ILTag):
         write_int(self.count, 2, False, writer)
 
 
-class ILVersionTag(ILTag):
+class ILVersionTag(ILFixedSizeTag):
     """
     This class implements the tag ILTAG_VERSION_ID.
     """
 
     def __init__(self, major: int = 0, minor: int = 0, revision: int = 0, build: int = 0, id: int = ILTAG_VERSION_ID) -> None:
-        super().__init__(id)
+        super().__init__(id, 16)
         self._values = [0, 0, 0, 0]
         self.major = major
         self.minor = minor
@@ -696,9 +699,6 @@ class ILVersionTag(ILTag):
     def build(self, value: int):
         self._set_field_core(value, 3)
 
-    def value_size(self) -> int:
-        return 4 * 4
-
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size != 16:
             raise ILTagCorruptedError('Corrupted range.')
@@ -715,8 +715,8 @@ class ILOIDTag(ILIntArrayTag):
     This class implements the tag ILTAG_OID_ID.
     """
 
-    def __init__(self) -> None:
-        super().__init__(ILTAG_OID_ID)
+    def __init__(self, values: List[int] = None) -> None:
+        super().__init__(values, ILTAG_OID_ID)
 
 
 class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
@@ -834,7 +834,7 @@ class ILStandardTagFactory(ILTagFactory):
         -1  # Reserved
     ]
 
-    CLASS_MAP = {
+    _CLASS_MAP = {
         ILTAG_NULL_ID: ILNullTag,
         ILTAG_BOOL_ID: ILBoolTag,
         ILTAG_INT8_ID: ILInt8Tag,
@@ -864,31 +864,35 @@ class ILStandardTagFactory(ILTagFactory):
     }
 
     def create(self, id: int) -> 'ILTag':
-        if id in ILStandardTagFactory.CLASS_MAP:
-            cls = ILStandardTagFactory.CLASS_MAP[id]
+        if id in ILStandardTagFactory._CLASS_MAP:
+            return ILStandardTagFactory._CLASS_MAP[id]()
         else:
-            cls = None
-        if cls != None:
-            return cls()
-        else:
-            if iltags_is_implicit(id) or self.strict:
-                raise ILTagUnknownError(f'Unknown tag with id {id}.')
-            else:
-                return ILRawTag(id)
+            return None
 
     def deserialize(self, reader: io.IOBase) -> 'ILTag':
-        tag_id, = pyilint.ilint_decode_from_stream(reader)
+
+        tag_offset = reader.tell()
+        tag_id, _ = pyilint.ilint_decode_from_stream(reader)
         tag = self.create(tag_id)
+        if tag is None:
+            if self.strict or iltags_is_implicit(tag_id):
+                raise ILTagUnknownError(
+                    f'Unknown tag with id {id} at {tag_offset}.')
+            else:
+                tag = ILRawTag(tag_id)
+
         if iltags_is_implicit(tag_id):
             tag_size = ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[tag_id]
         else:
-            tag_size, = pyilint.ilint_decode_from_stream(reader)
+            tag_size, _ = pyilint.ilint_decode_from_stream(reader)
+
         if tag_id == ILTAG_ILINT64_ID:
             tag.deserialize_value(self, tag_size, reader)
         else:
             value_reader = io.BytesIO(read_bytes(tag_size, reader))
             tag.deserialize_value(self, tag_size, value_reader)
-            if value_reader.tell() != tag_size:
+            left_behind = tag_size - value_reader.tell()
+            if left_behind != 0:
                 raise ILTagCorruptedError(
-                    f'Some bytes of the value where not used by {tag.__class__}.deserialize_value(). The tag value size is {tag_size}.')
+                    f'The tag at {tag_offset} with id {tag_id} and size {tag_size} could not be deserialized by the class {tag.__class__}. {left_behind} bytes were not used.')
         return tag

@@ -44,6 +44,47 @@ em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios da mona
 """.split()
 
 
+def generate_random_tags(size: int) -> List[ILTag]:
+    l = []
+    for i in range(size):
+        size = random.randrange(0, 65)
+    return l
+
+
+BASIC_TAG_SAMPLES = [
+    ILNullTag(),
+    ILBoolTag(),
+    ILInt8Tag(1),
+    ILUInt8Tag(2),
+    ILInt16Tag(3),
+    ILUInt16Tag(4),
+    ILInt32Tag(5),
+    ILUInt32Tag(6),
+    ILInt64Tag(7),
+    ILUInt64Tag(8),
+    ILILInt64Tag(0),
+    ILILInt64Tag(0xFE),
+    ILILInt64Tag(0xFEDC),
+    ILILInt64Tag(0xFEDCBA),
+    ILILInt64Tag(0xFEDCBA98),
+    ILILInt64Tag(0xFEDCBA9876),
+    ILILInt64Tag(0xFEDCBA987654),
+    ILILInt64Tag(0xFEDCBA98765432),
+    ILILInt64Tag(0xFEDCBA9876543210),
+    ILBinary32Tag(1.0),
+    ILBinary64Tag(2.0),
+    ILBinary128Tag(),
+    ILByteArrayTag(b'1234567890'),
+    ILStringTag('1234567890'),
+    ILBigIntegerTag(b'1234567890'),
+    ILBigDecimalTag(b'1234567890', -1),
+    ILIntArrayTag([0xFE, 0xFEDCBA9876543210]),
+    #ILRangeTag(123, 456),
+    ILVersionTag(1, 2, 3, 4),
+    ILOIDTag([1, 2, 3, 4])
+]
+
+
 class TestILTagIds(unittest.TestCase):
 
     def test_standard_ids(self):
@@ -710,9 +751,23 @@ class TestILIntArrayTag(unittest.TestCase):
         self.assertEqual(ILTAG_ILINT64_ARRAY_ID, t.id)
         self.assertEqual(0, len(t))
 
-        t = ILIntArrayTag(1234)
+        t = ILIntArrayTag([1, 2, 3])
+        self.assertEqual(ILTAG_ILINT64_ARRAY_ID, t.id)
+        self.assertEqual(3, len(t))
+        self.assertEqual(1, t[0])
+        self.assertEqual(2, t[1])
+        self.assertEqual(3, t[2])
+
+        t = ILIntArrayTag(None, 1234)
         self.assertEqual(1234, t.id)
         self.assertEqual(0, len(t))
+
+        t = ILIntArrayTag([1, 2, 3], 123)
+        self.assertEqual(123, t.id)
+        self.assertEqual(3, len(t))
+        self.assertEqual(1, t[0])
+        self.assertEqual(2, t[1])
+        self.assertEqual(3, t[2])
 
     def test_assert_value_type(self):
         t = ILIntArrayTag()
@@ -769,3 +824,235 @@ class TestILIntArrayTag(unittest.TestCase):
             reader.seek(0)
             writer.seek(0)
             self.assertEqual(reader.read(), writer.read())
+
+
+class ILTagComparatorMixin:
+    def assertILTagEqual(self, a: ILTag, b: ILTag):
+        self.assertEqual(a.id, b.id)
+        # It is the most inefficient way possible but works
+        aw = io.BytesIO()
+        bw = io.BytesIO()
+        a.serialize_value(aw)
+        b.serialize_value(bw)
+        aw.seek(0)
+        bw.seek(0)
+        self.assertEqual(aw.read(), bw.read())
+
+
+class TestILTagArrayTag(unittest.TestCase):
+    # TODO Implement it later
+    pass
+
+
+class TestILTagSequenceTag(unittest.TestCase):
+    # TODO Implement it later
+    pass
+
+
+class TestILRangeTag(unittest.TestCase):
+    # TODO Implement it later
+    pass
+
+
+class TestILVersionTag(unittest.TestCase):
+    def test_constructor(self):
+        t = ILVersionTag()
+        self.assertEqual(16, t.value_size())
+        self.assertEqual(ILTAG_VERSION_ID, t.id)
+        self.assertEqual(0, t.major)
+        self.assertEqual(0, t.minor)
+        self.assertEqual(0, t.revision)
+        self.assertEqual(0, t.build)
+
+        t = ILVersionTag(1, 2, 3, 4)
+        self.assertEqual(16, t.value_size())
+        self.assertEqual(ILTAG_VERSION_ID, t.id)
+        self.assertEqual(1, t.major)
+        self.assertEqual(2, t.minor)
+        self.assertEqual(3, t.revision)
+        self.assertEqual(4, t.build)
+
+        t = ILVersionTag(1, 2, 3, 4, 13123)
+        self.assertEqual(16, t.value_size())
+        self.assertEqual(13123, t.id)
+        self.assertEqual(1, t.major)
+        self.assertEqual(2, t.minor)
+        self.assertEqual(3, t.revision)
+        self.assertEqual(4, t.build)
+
+    def test_major(self):
+        t = ILVersionTag()
+        t.major = -(2**31)
+        t.major = (2**31) - 1
+        with self.assertRaises(ValueError):
+            t.major = -(2**31 + 1)
+        with self.assertRaises(ValueError):
+            t.major = 2**31
+
+    def test_minor(self):
+        t = ILVersionTag()
+        t.minor = -(2**31)
+        t.minor = (2**31) - 1
+        with self.assertRaises(ValueError):
+            t.minor = -(2**31 + 1)
+        with self.assertRaises(ValueError):
+            t.minor = 2**31
+
+    def test_revision(self):
+        t = ILVersionTag()
+        t.revision = -(2**31)
+        t.revision = (2**31) - 1
+        with self.assertRaises(ValueError):
+            t.revision = -(2**31 + 1)
+        with self.assertRaises(ValueError):
+            t.revision = 2**31
+
+    def test_build(self):
+        t = ILVersionTag()
+        t.build = -(2**31)
+        t.build = (2**31) - 1
+        with self.assertRaises(ValueError):
+            t.build = -(2**31 + 1)
+        with self.assertRaises(ValueError):
+            t.build = 2**31
+
+    def test_deserialize_value(self):
+
+        for sample in [[1, 2, 3, 4], [-1, -2, -3, -4]]:
+            reader = io.BytesIO()
+            for v in sample:
+                write_int(v, 4, True, reader)
+            reader.seek(0)
+            t = ILVersionTag()
+            t.deserialize_value(None, 16, reader)
+            self.assertEqual(sample[0], t.major)
+            self.assertEqual(sample[1], t.minor)
+            self.assertEqual(sample[2], t.revision)
+            self.assertEqual(sample[3], t.build)
+            reader.seek(0)
+            self.assertRaises(ILTagCorruptedError,
+                              t.deserialize_value, None, 15, reader)
+            reader.seek(1)
+            self.assertRaises(EOFError,
+                              t.deserialize_value, None, 16, reader)
+
+    def test_serialize_value(self):
+
+        for sample in [[1, 2, 3, 4], [-1, -2, -3, -4]]:
+            exp = io.BytesIO()
+            for v in sample:
+                write_int(v, 4, True, exp)
+            t = ILVersionTag(sample[0], sample[1], sample[2], sample[3])
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(exp.tell(), writer.tell())            
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
+
+
+class TestILOIDTag(unittest.TestCase):
+    def test_constructor(self):
+        t = ILOIDTag()
+        self.assertEqual(ILTAG_OID_ID, t.id)
+        self.assertEqual(0, len(t))
+
+        t = ILOIDTag([1, 2, 3])
+        self.assertEqual(ILTAG_OID_ID, t.id)
+        self.assertEqual(3, len(t))
+        self.assertEqual(1, t[0])
+        self.assertEqual(2, t[1])
+        self.assertEqual(3, t[2])
+
+
+class TestILDictionaryTag(unittest.TestCase):
+    # TODO Implement it later
+    pass
+
+
+class TestILStringDictionaryTag(unittest.TestCase):
+    # TODO Implement it later
+    pass
+
+
+class TestILStandardTagFactory(unittest.TestCase, ILTagComparatorMixin):
+
+    def test_implicit_sizes(self):
+        self.assertEqual(
+            0, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_NULL_ID])
+        self.assertEqual(
+            1, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_BOOL_ID])
+        self.assertEqual(
+            1, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_INT8_ID])
+        self.assertEqual(
+            1, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_UINT8_ID])
+        self.assertEqual(
+            2, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_INT16_ID])
+        self.assertEqual(
+            2, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_UINT16_ID])
+        self.assertEqual(
+            4, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_INT32_ID])
+        self.assertEqual(
+            4, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_UINT32_ID])
+        self.assertEqual(
+            8, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_INT64_ID])
+        self.assertEqual(
+            8, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_UINT64_ID])
+        self.assertEqual(
+            9, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_ILINT64_ID])
+        self.assertEqual(
+            4, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_BINARY32_ID])
+        self.assertEqual(
+            8, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_BINARY64_ID])
+        self.assertEqual(
+            16, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[ILTAG_BINARY128_ID])
+        self.assertEqual(
+            -1, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[14])
+        self.assertEqual(
+            -1, ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[15])
+
+    def test_create(self):
+        f = ILStandardTagFactory()
+        self.assertIsInstance(f.create(ILTAG_NULL_ID), ILNullTag)
+        self.assertIsInstance(f.create(ILTAG_BOOL_ID), ILBoolTag)
+        self.assertIsInstance(f.create(ILTAG_INT8_ID), ILInt8Tag)
+        self.assertIsInstance(f.create(ILTAG_UINT8_ID), ILUInt8Tag)
+        self.assertIsInstance(f.create(ILTAG_INT16_ID), ILInt16Tag)
+        self.assertIsInstance(f.create(ILTAG_UINT16_ID), ILUInt16Tag)
+        self.assertIsInstance(f.create(ILTAG_INT32_ID), ILInt32Tag)
+        self.assertIsInstance(f.create(ILTAG_UINT32_ID), ILUInt32Tag)
+        self.assertIsInstance(f.create(ILTAG_INT64_ID), ILInt64Tag)
+        self.assertIsInstance(f.create(ILTAG_UINT64_ID), ILUInt64Tag)
+        self.assertIsInstance(f.create(ILTAG_ILINT64_ID), ILILInt64Tag)
+        self.assertIsInstance(f.create(ILTAG_BINARY32_ID), ILBinary32Tag)
+        self.assertIsInstance(f.create(ILTAG_BINARY64_ID), ILBinary64Tag)
+        self.assertIsInstance(f.create(ILTAG_BINARY128_ID), ILBinary128Tag)
+        self.assertIsNone(f.create(14))
+        self.assertIsNone(f.create(15))
+        self.assertIsInstance(f.create(ILTAG_BYTE_ARRAY_ID), ILByteArrayTag)
+        self.assertIsInstance(f.create(ILTAG_STRING_ID), ILStringTag)
+        self.assertIsInstance(f.create(ILTAG_BINT_ID), ILBigIntegerTag)
+        self.assertIsInstance(f.create(ILTAG_BDEC_ID), ILBigDecimalTag)
+        self.assertIsInstance(f.create(ILTAG_ILINT64_ARRAY_ID), ILIntArrayTag)
+        self.assertIsInstance(f.create(ILTAG_ILTAG_ARRAY_ID), ILTagArrayTag)
+        self.assertIsInstance(f.create(ILTAG_ILTAG_SEQ_ID), ILTagSequenceTag)
+        self.assertIsInstance(f.create(ILTAG_RANGE_ID), ILRangeTag)
+        self.assertIsInstance(f.create(ILTAG_VERSION_ID), ILVersionTag)
+        self.assertIsInstance(f.create(ILTAG_OID_ID), ILOIDTag)
+        self.assertIsNone(f.create(26))
+        self.assertIsNone(f.create(27))
+        self.assertIsNone(f.create(28))
+        self.assertIsNone(f.create(29))
+        self.assertIsInstance(f.create(ILTAG_DICT_ID), ILDictionaryTag)
+        self.assertIsInstance(f.create(ILTAG_STRDICT_ID),
+                              ILStringDictionaryTag)
+        self.assertIsNone(f.create(32))
+
+    def test_deserialize(self):
+        f = ILStandardTagFactory()
+        for tag in BASIC_TAG_SAMPLES:
+            reader = io.BytesIO()
+            tag.serialize(reader)
+            reader.seek(0)
+            t = f.deserialize(reader)
+            self.assertILTagEqual(tag, t)

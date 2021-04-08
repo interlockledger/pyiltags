@@ -99,11 +99,19 @@ class ILTagFactory:
 
     def create(self, id: int) -> 'ILTag':
         """
-        Creates the appropriate instance of the tags
+        Creates the appropriate instance of the tags. Returns None if the class
+        is unknown.
+
+        This method must be overriden by subclasses.
         """
         raise NotImplementedError('Subclasses must override this method.')
 
     def deserialize(self, reader: io.IOBase) -> 'ILTag':
+        """
+        Deserializes a tag from the reader.
+
+        This method must be overriden by subclasses.
+        """
         raise NotImplementedError('Subclasses must override this method.')
 
 
@@ -251,7 +259,7 @@ class ILRawTag(ILTag):
             elif isinstance(value, bytes):
                 v = value
             else:
-                raise TypeError('The payload must ')
+                raise TypeError('The payload must bytes or bytearray.')
             self.assert_value_valid(v)
             self._value = v
 
