@@ -43,6 +43,17 @@ e quatro anos regressou ao Brasil, não podendo el-rei alcançar dele que ficass
 em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios da monarquia.
 """.split()
 
+# Unique words extracted from STRING_SAMPLES
+STRING_KEY_SAMPLES = \
+    ['trinta', 'regendo', 'Simão', 'ficasse', 'terra', 'que', 'de', 'remotos',
+     'Portugal', 'um', 'da', 'anos', 'universidade,', 'a', 'vila', 'quatro',
+     'Coimbra,', 'vivera', 'alcançar', 'certo', 'dizem', 'Lisboa,', 'expedindo',
+     'os', 'Dr.', 'regressou', 'das', 'dele', 'filho', 'Bacamarte,', 'e', 'dos',
+     'não', 'el-rei', 'Brasil,', 'Aos', 'médico,', 'médicos', 'do', 'nobreza',
+     'ali', 'maior', 'As', 'crônicas', 'em', 'Espanhas.', 'Estudara', 'Pádua.',
+     'o', 'ou', 'Coimbra', 'ao', 'Itaguaí', 'negócios', 'monarquia.', 'tempos',
+     'podendo']
+
 
 def generate_random_tags(size: int) -> List[ILTag]:
     l = []
@@ -639,6 +650,14 @@ class TestILStringTag(unittest.TestCase):
             writer.seek(0)
             self.assertEqual(exp.read(), writer.read())
 
+    def test_is_standard_string(self):
+        self.assertTrue(ILStringTag.is_standard_string(ILStringTag()))
+
+        self.assertFalse(ILStringTag.is_standard_string(
+            ILStringTag(id=123123)))
+        self.assertFalse(ILStringTag.is_standard_string(
+            ILRawTag(ILTAG_STRING_ID)))
+
 
 class TestILBigIntegerTag(unittest.TestCase):
 
@@ -1067,13 +1086,139 @@ class TestILOIDTag(unittest.TestCase):
 
 
 class TestILDictionaryTag(unittest.TestCase):
+
+    def test_constructor(self):
+        t = ILDictionaryTag()
+        self.assertEqual(ILTAG_DICT_ID, t.id)
+        self.assertEqual(0, len(t))
+
+        t = ILDictionaryTag(1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(0, len(t))
+
+    def test_assert_value_type(self):
+        t = ILDictionaryTag()
+        t.assert_value_type(ILNullTag())
+        t.assert_value_type(ILRawTag(123))
+        for k in [1, 1.0, [], '1']:
+            self.assertRaises(TypeError, t.assert_value_type, k)
+
+    def test_assert_key_type(self):
+        t = ILDictionaryTag()
+        t.assert_key_type('')
+        t.assert_key_type('123')
+        for k in [1, 1.0, []]:
+            self.assertRaises(TypeError, t.assert_key_type, k)
+
     # TODO Implement it later
-    pass
 
 
 class TestILStringDictionaryTag(unittest.TestCase):
-    # TODO Implement it later
-    pass
+
+    def test_constructor(self):
+        t = ILStringDictionaryTag()
+        self.assertEqual(ILTAG_STRDICT_ID, t.id)
+        self.assertEqual(0, len(t))
+
+        t = ILStringDictionaryTag(1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(0, len(t))
+
+    def test_assert_value_type(self):
+        t = ILStringDictionaryTag()
+        t.assert_value_type('')
+        t.assert_value_type('123')
+        for k in [1, 1.0, []]:
+            self.assertRaises(TypeError, t.assert_value_type, k)
+
+    def test_assert_key_type(self):
+        t = ILStringDictionaryTag()
+        t.assert_key_type('')
+        t.assert_key_type('123')
+        for k in [1, 1.0, []]:
+            self.assertRaises(TypeError, t.assert_key_type, k)
+
+    def test_value_size(self):
+        t = ILStringDictionaryTag()
+
+        entries = []
+        for k in STRING_KEY_SAMPLES:
+            entries.append(k)
+            t[k] = k + '-val'
+            value_size = pyilint.ilint_size(len(entries))
+            for e in entries:
+                value_size += ILStringTag.compute_string_tag_size(
+                    e) + ILStringTag.compute_string_tag_size(e + '-val')
+            self.assertEqual(value_size, t.value_size())
+
+    def test_deserialize_value(self):
+
+        entries = []
+        for k in STRING_KEY_SAMPLES:
+            entries.append(k)
+            reader = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(entries), reader)
+            for k in entries:
+                v = k + '-val'
+                ILStringTag.serialize_tag_from_components(k, reader)
+                ILStringTag.serialize_tag_from_components(v, reader)
+            value_size = reader.tell()
+            reader.seek(0)
+            t = ILStringDictionaryTag()
+            t.deserialize_value(ILStandardTagFactory(), value_size, reader)
+            self.assertEqual(value_size, reader.tell())
+            for k in entries:
+                v = k + '-val'
+                self.assertEqual(v, t[k])
+
+            reader.seek(1)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size, reader)
+            reader.seek(0)
+            reader.truncate(value_size - 1)
+            self.assertRaises(EOFError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size - 1, reader)
+
+        reader = io.BytesIO()
+        pyilint.ilint_encode_to_stream(1, reader)
+        ILNullTag().serialize(reader)
+        ILStringTag().serialize(reader)
+        value_size = reader.tell()
+        reader.seek(0)
+        t = ILStringDictionaryTag()
+        self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                          ILStandardTagFactory(), value_size, reader)
+
+        reader = io.BytesIO()
+        pyilint.ilint_encode_to_stream(1, reader)
+        ILStringTag('123').serialize(reader)
+        ILNullTag().serialize(reader)
+        value_size = reader.tell()
+        reader.seek(0)
+        t = ILStringDictionaryTag()
+        self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                          ILStandardTagFactory(), value_size, reader)
+
+    def test_serialize_value(self):
+
+        entries = []
+        for k in STRING_KEY_SAMPLES:
+            entries.append(k)
+            exp = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(entries), exp)
+            t = ILStringDictionaryTag()
+            for k in entries:
+                v = k + '-val'
+                t[k] = v
+                ILStringTag.serialize_tag_from_components(k, exp)
+                ILStringTag.serialize_tag_from_components(v, exp)
+
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(exp.tell(), writer.tell())
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
 
 
 class TestILStandardTagFactory(unittest.TestCase, ILTagComparatorMixin):
