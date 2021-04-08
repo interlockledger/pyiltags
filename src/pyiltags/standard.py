@@ -515,9 +515,9 @@ class ILIntArrayTag(ILTag, RestrictListMixin[int]):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        self.clear()
         if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
+        self.clear()
         count, = pyilint.ilint_decode_from_stream(reader)
         for i in range(count):
             v, = pyilint.ilint_decode_from_stream(reader)
@@ -548,9 +548,9 @@ class ILTagArrayTag(ILTag, RestrictListMixin[ILTag]):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        self.clear()
         if tag_size < (1 + 1):
             raise ILTagCorruptedError('Corrupted tag.')
+        self.clear()
         count, = pyilint.ilint_decode_from_stream(reader)
         for i in range(count):
             t = tag_factory.deserialize(reader)
@@ -716,50 +716,50 @@ class ILOIDTag(ILIntArrayTag):
         super().__init__(ILTAG_OID_ID)
 
 
-class ILDictionaryTag(ILTag):
+class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
     """
     This class implements the tag ILTAG_DICT_ID.
     """
 
     def __init__(self, id: int = ILTAG_DICT_ID) -> None:
         super().__init__(id)
-        self._values = []
 
-    @property
-    def values(self) -> List[Tuple[ILStringTag, ILTag]]:
-        return self._values
+    def assert_value_type(self, value: T):
+        if not isinstance(value, ILTag):
+            raise TypeError('The value must an ILTag.')
+
+    def assert_key_type(self, key: T):
+        if not isinstance(key, str):
+            raise TypeError('The key must be a string.')
 
     def value_size(self) -> int:
         size = pyilint.ilint_size(len(self.values))
-        for pair in self.values:
-            size += pair[0].tag_size() + pair[1].tag_size()
+        for key in self:
+            size += (ILStringTag.compute_string_tag_size(
+                key) + self[key].tag_size())
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < (1 + 1):
             raise ILTagCorruptedError('Corrupted tag.')
         count, = pyilint.ilint_decode_from_stream(reader)
-        self.values.clear()
+        self.clear()
         for i in range(count):
             key = tag_factory.deserialize(reader)
+            if key.id != ILTAG_STRING_ID or isinstance(key, ILStringTag):
+                raise ILTagCorruptedError(
+                    'Corrupted tag. One of the keys is not a string.')
             value = tag_factory.deserialize(reader)
-            if not isinstance(key, ILStringTag):
-                raise ILTagCorruptedError('Corrupted tag.')
-            self.values.append((key, value))
+            self[key.value] = value
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        for t in self.values:
-            if not isinstance(t[0], ILStringTag):
-                raise TypeError('At least one key is not a ILStringTag.')
-            if not isinstance(t[1], ILTag):
-                raise TypeError('At least one value is not a ILTag.')
         pyilint.ilint_encode_to_stream(len(self.values), writer)
-        for t in self.values:
-            t[0].serialize(writer)
-            t[1].serialize(writer)
+        for key in self:
+            ILStringTag.serialize_tag_from_components(key, writer)
+            self[key].serialize(writer)
 
 
-class ILStringDictionaryTag(ILTag):
+class ILStringDictionaryTag(ILTag, RestrictDictMixin[str, str]):
     """
     This class implements the tag ILTAG_STRDICT_ID.
     """
@@ -768,39 +768,42 @@ class ILStringDictionaryTag(ILTag):
         super().__init__(id)
         self._values = []
 
-    @property
-    def values(self) -> List[Tuple[ILStringTag, ILStringTag]]:
-        return self._values
+    def assert_value_type(self, value: T):
+        if not isinstance(value, str):
+            raise TypeError('The value must be a string.')
+
+    def assert_key_type(self, key: T):
+        if not isinstance(key, str):
+            raise TypeError('The key must be a string.')
 
     def value_size(self) -> int:
         size = pyilint.ilint_size(len(self.values))
-        for pair in self.values:
-            size += pair[0].tag_size() + pair[1].tag_size()
+        for key in self:
+            size += (ILStringTag.compute_string_tag_size(key) +
+                     ILStringTag.compute_string_tag_size(self[key]))
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < (1 + 1):
             raise ILTagCorruptedError('Corrupted tag.')
         count, = pyilint.ilint_decode_from_stream(reader)
-        self.values.clear()
+        self.clear()
         for i in range(count):
             key = tag_factory.deserialize(reader)
+            if key.id != ILTAG_STRING_ID or isinstance(key, ILStringTag):
+                raise ILTagCorruptedError(
+                    'Corrupted tag. One of the keys is not a string.')
             value = tag_factory.deserialize(reader)
-            if isinstance(key, ILStringTag) and isinstance(value, ILStringTag):
-                self.values.append((key, value))
-            else:
-                raise ILTagCorruptedError('Corrupted tag.')
+            if value.id != ILTAG_STRING_ID or isinstance(value, ILStringTag):
+                raise ILTagCorruptedError(
+                    'Corrupted tag. One of the keys is not a string.')
+            self[key.value] = value.value
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        for t in self.values:
-            if not isinstance(t[0], ILStringTag):
-                raise TypeError('At least one key is not a ILStringTag.')
-            if not isinstance(t[1], ILStringTag):
-                raise TypeError('At least one value is not a ILStringTag.')
         pyilint.ilint_encode_to_stream(len(self.values), writer)
-        for t in self.values:
-            t[0].serialize(writer)
-            t[1].serialize(writer)
+        for key in self:
+            ILStringTag.serialize_tag_from_components(key, writer)
+            ILStringTag.serialize_tag_from_components(self[key], writer)
 
 
 class ILStandardTagFactory(ILTagFactory):
