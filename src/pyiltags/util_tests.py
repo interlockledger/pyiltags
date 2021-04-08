@@ -29,6 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import unittest
+import random
 from .util import *
 
 
@@ -228,3 +229,148 @@ class TestRestrictListMixin(unittest.TestCase):
         l.append(1)
         l.clear()
         self.assertFalse(bool(l))
+
+    def test_repr(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        for i in range(5):
+            l.append(i)
+        s = str(l)
+        self.assertLess(0, len(s))
+
+    def test_contains(self):
+        l = TestRestrictListMixin.ExampleRestrictListMixin()
+
+        for i in range(5):
+            l.append(100 + i)
+
+        for i in range(5):
+            self.assertFalse(i in l)
+            self.assertTrue(100 + i in l)
+
+
+class TestRestrictDictMixin(unittest.TestCase):
+
+    class A:
+        pass
+
+    class StrIntRestrictDictMixin(A, RestrictDictMixin):
+        def assert_value_type(self, value: T):
+            if not isinstance(value, int):
+                raise TypeError()
+
+        def assert_key_type(self, key: T):
+            if not isinstance(key, str):
+                raise TypeError()
+
+    def test_assert_value_type(self):
+
+        d = RestrictDictMixin()
+        for v in [None, 1, 1.0, 's', []]:
+            d.assert_value_type(v)
+
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+        d.assert_value_type(1)
+        d.assert_value_type(2)
+        for v in [None, 1.0, 's', []]:
+            with self.assertRaises(TypeError):
+                d.assert_value_type(v)
+
+    def test_assert_key_type(self):
+
+        d = RestrictDictMixin()
+        for k in [None, 1, 1.0, 's', []]:
+            d.assert_key_type(k)
+
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+        d.assert_key_type('')
+        d.assert_key_type('2')
+        for k in [None, 1, 1.0, []]:
+            with self.assertRaises(TypeError):
+                d.assert_key_type(k)
+
+    def test_clear(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        d[''] = 1
+        d['2'] = 2
+        self.assertEqual(2, len(d))
+        d.clear()
+        self.assertEqual(0, len(d))
+
+    def test_len_bool(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        self.assertEqual(0, len(d))
+        self.assertFalse(d)
+        d[''] = 1
+        self.assertEqual(1, len(d))
+        self.assertTrue(d)
+        d['2'] = 2
+        self.assertEqual(2, len(d))
+        self.assertTrue(d)
+        d.clear()
+        self.assertEqual(0, len(d))
+        self.assertFalse(d)
+
+    def test_delitem(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        d[''] = 1
+        d['2'] = 2
+        self.assertTrue('' in d)
+        self.assertTrue('2' in d)
+        del d['']
+        self.assertFalse('' in d)
+        del d['2']
+        self.assertFalse('2' in d)
+
+    def test_getsetitem(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        keys = ['k' + str(x) for x in range(10)]
+        random.shuffle(keys)
+
+        for k in keys:
+            d[k] = int(k[1:])
+
+        for k in keys:
+            self.assertEqual(d[k], int(k[1:]))
+
+    def test_iter(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        keys = ['k' + str(x) for x in range(10)]
+        random.shuffle(keys)
+
+        for k in keys:
+            d[k] = int(k[1:])
+
+        order = iter(keys)
+        for k in d:
+            self.assertEqual(next(order), k)
+
+    def test_repr(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        keys = ['k' + str(x) for x in range(3)]
+        random.shuffle(keys)
+        for k in keys:
+            d[k] = int(k[1:])
+        s = str(d)
+        self.assertLess(0, len(s))
+
+    def test_contains(self):
+        d = TestRestrictDictMixin.StrIntRestrictDictMixin()
+
+        keys = ['k' + str(x) for x in range(10)]
+        random.shuffle(keys)
+
+        for k in keys[:5]:
+            d[k] = int(k[1:])
+
+        for k in keys[:5]:
+            self.assertTrue(k in d)
+
+        for k in keys[5:]:
+            self.assertFalse(k in d)

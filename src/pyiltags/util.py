@@ -29,8 +29,10 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from typing import Generic, Tuple, TypeVar
+import collections
 
 T = TypeVar('T')
+KT = TypeVar('KT')
 
 _INT_BOUNDS = {
     1: (0, 255),
@@ -137,3 +139,59 @@ class RestrictListMixin(Generic[T]):
 
     def __repr__(self) -> str:
         return str(self._values)
+
+    def __contains__(self, value: int) -> bool:
+        return value in self._values
+
+
+class RestrictDictMixin(Generic[KT, T]):
+    """
+    This Mixin class adds a simple restricted type dictionary
+    operation to other classes. It also preserves the insertion
+    order.
+
+    The restriction is implemented by the method assert_value_type() 
+    that should raise a `TypeError` if the value that will be added
+    cannot be accepted.
+
+    This functionality was added to avoid potencial type errors in
+    this library.
+    """
+
+    def __init__(self) -> None:
+        self._values = collections.OrderedDict()
+
+    def assert_value_type(self, value: T):
+        pass
+
+    def assert_key_type(self, key: T):
+        pass
+
+    def clear(self):
+        self._values.clear()
+
+    def __bool__(self) -> bool:
+        return bool(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __delitem__(self, key: KT):
+        del self._values[key]
+
+    def __getitem__(self, key: KT) -> T:
+        return self._values[key]
+
+    def __setitem__(self, key: KT, value: T):
+        self.assert_key_type(key)
+        self.assert_value_type(value)
+        self._values[key] = value
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __repr__(self) -> str:
+        return str(self._values)
+
+    def __contains__(self, key: KT) -> bool:
+        return key in self._values
