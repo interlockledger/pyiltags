@@ -152,9 +152,19 @@ class ILTag:
         """
         Returns the size of the tag in bytes.
         """
-        value_size = self.value_size()
-        size = pyilint.ilint_size(self.id) + value_size
-        if not self.implicit:
+        return ILTag.compute_tag_size(self.id, self.value_size())
+
+    @staticmethod
+    def compute_tag_size(id: int, value_size: int) -> int:
+        """
+        Computes the tag size based on the id and the value size.
+
+        Parameters:
+        - `id`: The tag id;
+        - `value_size`: The value size;
+        """
+        size = pyilint.ilint_size(id) + value_size
+        if not iltags_is_implicit(id):
             size += pyilint.ilint_size(value_size)
         return size
 

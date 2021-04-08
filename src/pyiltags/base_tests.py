@@ -170,6 +170,18 @@ class TestILTag(unittest.TestCase):
         writer.seek(0)
         self.assertEqual(exp.read(), writer.read())
 
+    def test_compute_tag_size(self):
+
+        for value_size in [0, 15, 16, 0xFFFF, 0xFFFFFFFFFFFFFFFF]:
+            for id in range(16):
+                exp = pyilint.ilint_size(id) + value_size
+                self.assertEqual(exp, ILTag.compute_tag_size(id, value_size))
+
+            for id in [16, 0xFFFF, 0xFFFFFFFFFFFFFFFF]:
+                exp = pyilint.ilint_size(
+                    id) + pyilint.ilint_size(value_size) + value_size
+                self.assertEqual(exp, ILTag.compute_tag_size(id, value_size))
+
 
 class TestILRawTag(unittest.TestCase):
 
