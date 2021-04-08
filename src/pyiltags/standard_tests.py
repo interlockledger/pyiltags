@@ -51,6 +51,18 @@ def generate_random_tags(size: int) -> List[ILTag]:
     return l
 
 
+SAMPLE_ILINT_VALUES = [
+    0,
+    0xFE,
+    0xFEDC,
+    0xFEDCBA,
+    0xFEDCBA98,
+    0xFEDCBA9876,
+    0xFEDCBA987654,
+    0xFEDCBA98765432,
+    0xFEDCBA9876543210,
+]
+
 BASIC_TAG_SAMPLES = [
     ILNullTag(),
     ILBoolTag(),
@@ -79,7 +91,7 @@ BASIC_TAG_SAMPLES = [
     ILBigIntegerTag(b'1234567890'),
     ILBigDecimalTag(b'1234567890', -1),
     ILIntArrayTag([0xFE, 0xFEDCBA9876543210]),
-    #ILRangeTag(123, 456),
+    ILRangeTag(123, 456),
     ILVersionTag(1, 2, 3, 4),
     ILOIDTag([1, 2, 3, 4])
 ]
@@ -850,8 +862,97 @@ class TestILTagSequenceTag(unittest.TestCase):
 
 
 class TestILRangeTag(unittest.TestCase):
-    # TODO Implement it later
-    pass
+
+    def test_constructor(self):
+        t = ILRangeTag()
+        self.assertEqual(ILTAG_RANGE_ID, t.id)
+        self.assertEqual(0, t.first)
+        self.assertEqual(0, t.count)
+
+        t = ILRangeTag(1, 2)
+        self.assertEqual(ILTAG_RANGE_ID, t.id)
+        self.assertEqual(1, t.first)
+        self.assertEqual(2, t.count)
+
+        t = ILRangeTag(1, 2, 123)
+        self.assertEqual(123, t.id)
+        self.assertEqual(1, t.first)
+        self.assertEqual(2, t.count)
+
+    def test_first(self):
+        t = ILRangeTag()
+        t.first = 0
+        t.first = (2**64) - 1
+        with self.assertRaises(ValueError):
+            t.first = -1
+        with self.assertRaises(ValueError):
+            t.first = 2**64
+
+    def test_count(self):
+        t = ILRangeTag()
+        t.count = 0
+        t.count = (2**16) - 1
+        with self.assertRaises(ValueError):
+            t.count = -1
+        with self.assertRaises(ValueError):
+            t.count = 2**16
+
+    def test_value_size(self):
+
+        for start in SAMPLE_ILINT_VALUES:
+            t = ILRangeTag(start, 123)
+            exp = pyilint.ilint_size(start) + 2
+            self.assertEqual(exp, t.value_size())
+
+    def test_deserialize_value(self):
+
+        for first in SAMPLE_ILINT_VALUES:
+            count = random.randrange(0, 2**16)
+            reader = io.BytesIO()
+            pyilint.ilint_encode_to_stream(first, reader)
+            write_int(count, 2, False, reader)
+            value_size = reader.tell()
+
+            t = ILRangeTag()
+            reader.seek(0)
+            t.deserialize_value(None, value_size, reader)
+            self.assertEqual(first, t.first)
+            self.assertEqual(count, t.count)
+            self.assertEqual(value_size, reader.tell())
+
+        sample = b'\xFF' * 9 + b'12'
+        reader = io.BytesIO(sample)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, len(sample), reader)
+
+        sample = b'\xFF' * 4
+        reader = io.BytesIO(sample)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, len(sample), reader)
+
+        sample = b'\x001'
+        reader = io.BytesIO(sample)
+        self.assertRaises(ILTagCorruptedError,
+                          t.deserialize_value, None, len(sample), reader)
+
+        sample = b'\xf8\x001'
+        reader = io.BytesIO(sample)
+        self.assertRaises(EOFError,
+                          t.deserialize_value, None, len(sample), reader)
+
+    def test_serialize_value(self):
+
+        for first in SAMPLE_ILINT_VALUES:
+            count = random.randrange(0, 2**16)
+            exp = io.BytesIO()
+            pyilint.ilint_encode_to_stream(first, exp)
+            write_int(count, 2, False, exp)
+
+            t = ILRangeTag(first, count)
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(exp.tell(), writer.tell())
+            self.assertEqual(exp.read(), writer.read())
 
 
 class TestILVersionTag(unittest.TestCase):
@@ -945,7 +1046,7 @@ class TestILVersionTag(unittest.TestCase):
             t = ILVersionTag(sample[0], sample[1], sample[2], sample[3])
             writer = io.BytesIO()
             t.serialize_value(writer)
-            self.assertEqual(exp.tell(), writer.tell())            
+            self.assertEqual(exp.tell(), writer.tell())
             exp.seek(0)
             writer.seek(0)
             self.assertEqual(exp.read(), writer.read())

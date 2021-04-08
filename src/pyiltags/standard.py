@@ -622,14 +622,14 @@ class ILRangeTag(ILTag):
 
     @property
     def count(self) -> int:
-        return self._first
+        return self._count
 
     @count.setter
     def count(self, value: int):
         if not isinstance(value, int):
             raise TypeError('count must be an integer.')
         assert_int_bounds(value, 2, False)
-        self._first = value
+        self._count = value
 
     def value_size(self) -> int:
         return pyilint.ilint_size(self.first) + 2
@@ -638,8 +638,10 @@ class ILRangeTag(ILTag):
         if tag_size < 3:
             raise ILTagCorruptedError('Corrupted range.')
         try:
-            self.first, = pyilint.ilint_decode_from_stream(reader)
-            self.count = read_int(2, False, reader)
+            first, _ = pyilint.ilint_decode_from_stream(reader)
+            count = read_int(2, False, reader)
+            self.first = first
+            self.count = count
         except ValueError:
             raise ILTagCorruptedError('Corrupted range.')
 
