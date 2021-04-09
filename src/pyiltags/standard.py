@@ -545,9 +545,12 @@ class ILTagArrayTag(ILTag, RestrictListMixin[ILTag]):
     This class implements the tag ILTAG_ILTAG_ARRAY_ID.
     """
 
-    def __init__(self, id: int = ILTAG_ILTAG_ARRAY_ID) -> None:
+    def __init__(self, values: List[ILTag] = None, id: int = ILTAG_ILTAG_ARRAY_ID) -> None:
         super().__init__(id)
         RestrictListMixin.__init__(self)
+        if values:
+            for v in values:
+                self.append(v)
 
     def assert_value_type(self, value: T):
         if not isinstance(value, ILTag):
@@ -562,8 +565,12 @@ class ILTagArrayTag(ILTag, RestrictListMixin[ILTag]):
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
         if tag_size < (1 + 1):
             raise ILTagCorruptedError('Corrupted tag.')
+        reader = LimitedReaderWrapper(reader, tag_size)
         self.clear()
-        count, = pyilint.ilint_decode_from_stream(reader)
+        try:
+            count, _ = pyilint.ilint_decode_from_stream(reader)
+        except ValueError:
+            raise ILTagCorruptedError('Corrupted tag.')
         for i in range(count):
             t = tag_factory.deserialize(reader)
             self.append(t)
@@ -579,9 +586,12 @@ class ILTagSequenceTag(ILTag, RestrictListMixin[ILTag]):
     This class implements the tag ILTAG_ILTAG_SEQ_ID.
     """
 
-    def __init__(self, id: int = ILTAG_ILTAG_SEQ_ID) -> None:
+    def __init__(self, values: List[ILTag] = None, id: int = ILTAG_ILTAG_SEQ_ID) -> None:
         super().__init__(id)
         RestrictListMixin.__init__(self)
+        if values:
+            for v in values:
+                self.append(v)
 
     def assert_value_type(self, value: T):
         if not isinstance(value, ILTag):
@@ -594,12 +604,11 @@ class ILTagSequenceTag(ILTag, RestrictListMixin[ILTag]):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
+        reader = LimitedReaderWrapper(reader, tag_size)
         self.clear()
-        if tag_size > 0:
-            r = io.BytesIO(read_bytes(tag_size))
-            while r.tell() < tag_size:
-                t = tag_factory.deserialize(r)
-                self.values.append(t)
+        while reader.remaining:
+            t = tag_factory.deserialize(reader)
+            self.append(t)
 
     def serialize_value(self, writer: io.IOBase) -> None:
         for t in self:

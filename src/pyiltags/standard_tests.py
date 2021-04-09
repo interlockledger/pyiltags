@@ -28,6 +28,7 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from io import SEEK_END
 from typing import Callable
 import codecs
 import unittest
@@ -881,14 +882,179 @@ class ILTagComparatorMixin:
         self.assertEqual(aw.read(), bw.read())
 
 
-class TestILTagArrayTag(unittest.TestCase):
-    # TODO Implement it later
-    pass
+class TestILTagArrayTag(unittest.TestCase, ILTagComparatorMixin):
+
+    def test_constructor(self):
+        t = ILTagArrayTag()
+        self.assertEqual(ILTAG_ILTAG_ARRAY_ID, t.id)
+        self.assertEqual(0, len(t))
+
+        t = ILTagArrayTag(BASIC_TAG_SAMPLES)
+        self.assertEqual(ILTAG_ILTAG_ARRAY_ID, t.id)
+        self.assertEqual(len(BASIC_TAG_SAMPLES), len(t))
+        for i in range(len(BASIC_TAG_SAMPLES)):
+            self.assertILTagEqual(BASIC_TAG_SAMPLES[i], t[i])
+
+        t = ILTagArrayTag(BASIC_TAG_SAMPLES, 1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(len(BASIC_TAG_SAMPLES), len(t))
+        for i in range(len(BASIC_TAG_SAMPLES)):
+            self.assertILTagEqual(BASIC_TAG_SAMPLES[i], t[i])
+
+    def test_assert_value_type(self):
+        t = ILTagArrayTag()
+        for tag in BASIC_TAG_SAMPLES:
+            t.assert_value_type(tag)
+        self.assertRaises(TypeError, t.assert_value_type, None)
+        self.assertRaises(TypeError, t.assert_value_type, 'a')
+        self.assertRaises(TypeError, t.assert_value_type, 1)
+        self.assertRaises(TypeError, t.assert_value_type, 1.0)
+        self.assertRaises(TypeError, t.assert_value_type, [])
+
+    def test_value_size(self):
+
+        t = ILTagArrayTag()
+        tags = []
+        for tag in BASIC_TAG_SAMPLES:
+            tags.append(tag)
+            t.append(tag)
+            value_size = pyilint.ilint_size(len(tags))
+            for v in tags:
+                value_size += v.tag_size()
+            self.assertEqual(value_size, t.value_size())
+
+    def test_deserialize_value(self):
+
+        tags = []
+        t = ILTagArrayTag()
+        for tag in BASIC_TAG_SAMPLES:
+            tags.append(tag)
+            reader = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(tags), reader)
+            for v in tags:
+                v.serialize(reader)
+            value_size = reader.tell()
+            reader.seek(0)
+            t.deserialize_value(ILStandardTagFactory(), value_size, reader)
+            self.assertEqual(value_size, reader.tell())
+            for i in range(len(tags)):
+                self.assertILTagEqual(tags[i], t[i])
+
+            reader.seek(0)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size - 1, reader)
+            reader.seek(0)
+            reader.write(b'\xFF')
+            reader.seek(0)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size, reader)
+
+    def test_serialize_value(self):
+
+        tags = []
+        for tag in BASIC_TAG_SAMPLES:
+            t = ILTagArrayTag()
+            tags.append(tag)
+            exp = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(tags), exp)
+            for v in tags:
+                v.serialize(exp)
+                t.append(v)
+
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(exp.tell(), writer.tell())
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
 
 
-class TestILTagSequenceTag(unittest.TestCase):
-    # TODO Implement it later
-    pass
+class TestILTagSequenceTag(unittest.TestCase, ILTagComparatorMixin):
+    def test_constructor(self):
+        t = ILTagSequenceTag()
+        self.assertEqual(ILTAG_ILTAG_SEQ_ID, t.id)
+        self.assertEqual(0, len(t))
+
+        t = ILTagSequenceTag(BASIC_TAG_SAMPLES)
+        self.assertEqual(ILTAG_ILTAG_SEQ_ID, t.id)
+        self.assertEqual(len(BASIC_TAG_SAMPLES), len(t))
+        for i in range(len(BASIC_TAG_SAMPLES)):
+            self.assertILTagEqual(BASIC_TAG_SAMPLES[i], t[i])
+
+        t = ILTagSequenceTag(BASIC_TAG_SAMPLES, 1234)
+        self.assertEqual(1234, t.id)
+        self.assertEqual(len(BASIC_TAG_SAMPLES), len(t))
+        for i in range(len(BASIC_TAG_SAMPLES)):
+            self.assertILTagEqual(BASIC_TAG_SAMPLES[i], t[i])
+
+    def test_assert_value_type(self):
+        t = ILTagSequenceTag()
+        for tag in BASIC_TAG_SAMPLES:
+            t.assert_value_type(tag)
+        self.assertRaises(TypeError, t.assert_value_type, None)
+        self.assertRaises(TypeError, t.assert_value_type, 'a')
+        self.assertRaises(TypeError, t.assert_value_type, 1)
+        self.assertRaises(TypeError, t.assert_value_type, 1.0)
+        self.assertRaises(TypeError, t.assert_value_type, [])
+
+    def test_value_size(self):
+
+        t = ILTagSequenceTag()
+        tags = []
+        for tag in BASIC_TAG_SAMPLES:
+            tags.append(tag)
+            t.append(tag)
+            value_size = 0
+            for v in tags:
+                value_size += v.tag_size()
+            self.assertEqual(value_size, t.value_size())
+
+    def test_deserialize_value(self):
+
+        tags = []
+        t = ILTagSequenceTag(BASIC_TAG_SAMPLES)
+        reader = io.BytesIO()
+        t.deserialize_value(ILStandardTagFactory(), 0, reader)
+
+        for tag in BASIC_TAG_SAMPLES:
+            tags.append(tag)
+            reader = io.BytesIO()
+            for v in tags:
+                v.serialize(reader)
+            value_size = reader.tell()
+            reader.seek(0)
+            t.deserialize_value(ILStandardTagFactory(), value_size, reader)
+            self.assertEqual(value_size, reader.tell())
+            for i in range(len(tags)):
+                self.assertILTagEqual(tags[i], t[i])
+
+            reader.seek(0)
+            if value_size > 1:
+                self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                                  ILStandardTagFactory(), value_size - 1, reader)
+            reader.seek(0, SEEK_END)
+            reader.write(b'\xFF')
+            reader.seek(0)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size + 1, reader)
+
+    def test_serialize_value(self):
+
+        tags = []
+        for tag in BASIC_TAG_SAMPLES:
+            t = ILTagSequenceTag()
+            tags.append(tag)
+            exp = io.BytesIO()
+            for v in tags:
+                v.serialize(exp)
+                t.append(v)
+
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(exp.tell(), writer.tell())
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
 
 
 class TestILRangeTag(unittest.TestCase):
