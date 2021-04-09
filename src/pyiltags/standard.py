@@ -748,7 +748,7 @@ class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
             raise TypeError('The key must be a string.')
 
     def value_size(self) -> int:
-        size = pyilint.ilint_size(len(self.values))
+        size = pyilint.ilint_size(len(self))
         for key in self:
             size += (ILStringTag.compute_string_tag_size(
                 key) + self[key].tag_size())
@@ -761,14 +761,14 @@ class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
         self.clear()
         for i in range(count):
             key = tag_factory.deserialize(reader)
-            if key.id != ILTAG_STRING_ID or isinstance(key, ILStringTag):
+            if not ILStringTag.is_standard_string(key):
                 raise ILTagCorruptedError(
                     'Corrupted tag. One of the keys is not a string.')
             value = tag_factory.deserialize(reader)
             self[key.value] = value
 
     def serialize_value(self, writer: io.IOBase) -> None:
-        pyilint.ilint_encode_to_stream(len(self.values), writer)
+        pyilint.ilint_encode_to_stream(len(self), writer)
         for key in self:
             ILStringTag.serialize_tag_from_components(key, writer)
             self[key].serialize(writer)
@@ -879,29 +879,32 @@ class ILStandardTagFactory(ILTagFactory):
             return None
 
     def deserialize(self, reader: io.IOBase) -> 'ILTag':
-
         tag_offset = reader.tell()
-        tag_id, _ = pyilint.ilint_decode_from_stream(reader)
-        tag = self.create(tag_id)
-        if tag is None:
-            if self.strict or iltags_is_implicit(tag_id):
-                raise ILTagUnknownError(
-                    f'Unknown tag with id {id} at {tag_offset}.')
+        try:
+            tag_id, _ = pyilint.ilint_decode_from_stream(reader)
+            tag = self.create(tag_id)
+            if tag is None:
+                if self.strict or iltags_is_implicit(tag_id):
+                    raise ILTagUnknownError(
+                        f'Unknown tag with id {id} at {tag_offset}.')
+                else:
+                    tag = ILRawTag(tag_id)
+
+            if iltags_is_implicit(tag_id):
+                tag_size = ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[tag_id]
             else:
-                tag = ILRawTag(tag_id)
+                tag_size, _ = pyilint.ilint_decode_from_stream(reader)
 
-        if iltags_is_implicit(tag_id):
-            tag_size = ILStandardTagFactory.ILTAG_IMPLICIT_SIZES[tag_id]
-        else:
-            tag_size, _ = pyilint.ilint_decode_from_stream(reader)
-
-        if tag_id == ILTAG_ILINT64_ID:
-            tag.deserialize_value(self, tag_size, reader)
-        else:
-            value_reader = io.BytesIO(read_bytes(tag_size, reader))
-            tag.deserialize_value(self, tag_size, value_reader)
-            left_behind = tag_size - value_reader.tell()
-            if left_behind != 0:
-                raise ILTagCorruptedError(
-                    f'The tag at {tag_offset} with id {tag_id} and size {tag_size} could not be deserialized by the class {tag.__class__}. {left_behind} bytes were not used.')
-        return tag
+            if tag_id == ILTAG_ILINT64_ID:
+                tag.deserialize_value(self, tag_size, reader)
+            else:
+                value_reader = io.BytesIO(read_bytes(tag_size, reader))
+                tag.deserialize_value(self, tag_size, value_reader)
+                left_behind = tag_size - value_reader.tell()
+                if left_behind != 0:
+                    raise ILTagCorruptedError(
+                        f'The tag at {tag_offset} with id {tag_id} and size {tag_size} could not be deserialized by the class {tag.__class__}. {left_behind} bytes were not used.')
+            return tag
+        except (ValueError, EOFError):
+            raise ILTagCorruptedError(
+                f'Corrupted tag at {tag_offset}.')

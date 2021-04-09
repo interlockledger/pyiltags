@@ -108,6 +108,17 @@ BASIC_TAG_SAMPLES = [
 ]
 
 
+def __create_sample_dict():
+    n = min(len(BASIC_TAG_SAMPLES), len(STRING_KEY_SAMPLES))
+    ret = []
+    for i in range(n):
+        ret.append((STRING_KEY_SAMPLES[i], BASIC_TAG_SAMPLES[i]))
+    return ret
+
+
+SAMPLE_DICT = __create_sample_dict()
+
+
 class TestILTagIds(unittest.TestCase):
 
     def test_standard_ids(self):
@@ -1085,7 +1096,7 @@ class TestILOIDTag(unittest.TestCase):
         self.assertEqual(3, t[2])
 
 
-class TestILDictionaryTag(unittest.TestCase):
+class TestILDictionaryTag(unittest.TestCase, ILTagComparatorMixin):
 
     def test_constructor(self):
         t = ILDictionaryTag()
@@ -1110,7 +1121,73 @@ class TestILDictionaryTag(unittest.TestCase):
         for k in [1, 1.0, []]:
             self.assertRaises(TypeError, t.assert_key_type, k)
 
-    # TODO Implement it later
+    def test_value_size(self):
+        t = ILDictionaryTag()
+
+        entries = []
+        for e in SAMPLE_DICT:
+            entries.append(e)
+            t[e[0]] = e[1]
+            value_size = pyilint.ilint_size(len(entries))
+            for e in entries:
+                value_size += ILStringTag.compute_string_tag_size(
+                    e[0]) + e[1].tag_size()
+            self.assertEqual(value_size, t.value_size())
+
+    def test_deserialize_value(self):
+
+        entries = []
+        for e in SAMPLE_DICT:
+            entries.append(e)
+            reader = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(entries), reader)
+            for k in entries:
+                ILStringTag.serialize_tag_from_components(k[0], reader)
+                k[1].serialize(reader)
+            value_size = reader.tell()
+            reader.seek(0)
+            t = ILDictionaryTag()
+            t.deserialize_value(ILStandardTagFactory(), value_size, reader)
+            self.assertEqual(value_size, reader.tell())
+            for k in entries:
+                self.assertILTagEqual(t[k[0]], k[1])
+
+            reader.seek(1)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size, reader)
+            reader.seek(0)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size - 1,
+                              LimitedReaderWrapper(reader, value_size - 1))
+
+        reader = io.BytesIO()
+        pyilint.ilint_encode_to_stream(1, reader)
+        ILNullTag().serialize(reader)
+        ILStringTag().serialize(reader)
+        value_size = reader.tell()
+        reader.seek(0)
+        t = ILDictionaryTag()
+        self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                          ILStandardTagFactory(), value_size, reader)
+
+    def test_serialize_value(self):
+
+        entries = []
+        for e in SAMPLE_DICT:
+            entries.append(e)
+            exp = io.BytesIO()
+            pyilint.ilint_encode_to_stream(len(entries), exp)
+            t = ILDictionaryTag()
+            for k in entries:
+                ILStringTag.serialize_tag_from_components(k[0], exp)
+                k[1].serialize(exp)
+                t[k[0]] = k[1]
+            writer = io.BytesIO()
+            t.serialize_value(writer)
+            self.assertEqual(exp.tell(), writer.tell())
+            exp.seek(0)
+            writer.seek(0)
+            self.assertEqual(exp.read(), writer.read())
 
 
 class TestILStringDictionaryTag(unittest.TestCase):
@@ -1158,26 +1235,26 @@ class TestILStringDictionaryTag(unittest.TestCase):
             entries.append(k)
             reader = io.BytesIO()
             pyilint.ilint_encode_to_stream(len(entries), reader)
-            for k in entries:
-                v = k + '-val'
-                ILStringTag.serialize_tag_from_components(k, reader)
+            for e in entries:
+                v = e + '-val'
+                ILStringTag.serialize_tag_from_components(e, reader)
                 ILStringTag.serialize_tag_from_components(v, reader)
             value_size = reader.tell()
             reader.seek(0)
             t = ILStringDictionaryTag()
             t.deserialize_value(ILStandardTagFactory(), value_size, reader)
             self.assertEqual(value_size, reader.tell())
-            for k in entries:
-                v = k + '-val'
-                self.assertEqual(v, t[k])
+            for e in entries:
+                v = e + '-val'
+                self.assertEqual(v, t[e])
 
             reader.seek(1)
             self.assertRaises(ILTagCorruptedError, t.deserialize_value,
                               ILStandardTagFactory(), value_size, reader)
             reader.seek(0)
-            reader.truncate(value_size - 1)
-            self.assertRaises(EOFError, t.deserialize_value,
-                              ILStandardTagFactory(), value_size - 1, reader)
+            self.assertRaises(ILTagCorruptedError, t.deserialize_value,
+                              ILStandardTagFactory(), value_size - 1,
+                              LimitedReaderWrapper(reader, value_size - 1))
 
         reader = io.BytesIO()
         pyilint.ilint_encode_to_stream(1, reader)
