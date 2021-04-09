@@ -563,7 +563,7 @@ class ILTagArrayTag(ILTag, RestrictListMixin[ILTag]):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        if tag_size < (1 + 1):
+        if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
         reader = LimitedReaderWrapper(reader, tag_size)
         self.clear()
@@ -764,7 +764,7 @@ class ILDictionaryTag(ILTag, RestrictDictMixin[str, ILTag]):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        if tag_size < (1 + 1):
+        if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
         count, _ = pyilint.ilint_decode_from_stream(reader)
         self.clear()
@@ -810,7 +810,7 @@ class ILStringDictionaryTag(ILTag, RestrictDictMixin[str, str]):
         return size
 
     def deserialize_value(self, tag_factory: ILTagFactory, tag_size: int, reader: io.IOBase) -> None:
-        if tag_size < (1 + 1):
+        if tag_size < 1:
             raise ILTagCorruptedError('Corrupted tag.')
         count, _ = pyilint.ilint_decode_from_stream(reader)
         self.clear()

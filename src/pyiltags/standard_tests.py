@@ -56,11 +56,14 @@ STRING_KEY_SAMPLES = \
      'podendo']
 
 
-def generate_random_tags(size: int) -> List[ILTag]:
-    l = []
+def generate_random_tag(id: int = None) -> ILTag:
+    if id is None:
+        id = random.randrange(0, 2**64)
+    size = random.randrange(0, 1024)
+    payload = bytearray()
     for i in range(size):
-        size = random.randrange(0, 65)
-    return l
+        payload.append(random.randrange(0, 256))
+    return ILRawTag(id, payload)
 
 
 SAMPLE_ILINT_VALUES = [
@@ -103,9 +106,13 @@ BASIC_TAG_SAMPLES = [
     ILBigIntegerTag(b'1234567890'),
     ILBigDecimalTag(b'1234567890', -1),
     ILIntArrayTag([0xFE, 0xFEDCBA9876543210]),
+    ILTagArrayTag(),
+    ILTagSequenceTag(),
     ILRangeTag(123, 456),
     ILVersionTag(1, 2, 3, 4),
-    ILOIDTag([1, 2, 3, 4])
+    ILOIDTag([1, 2, 3, 4]),
+    ILDictionaryTag(),
+    ILStringDictionaryTag()
 ]
 
 
@@ -1545,3 +1552,37 @@ class TestILStandardTagFactory(unittest.TestCase, ILTagComparatorMixin):
             reader.seek(0)
             t = f.deserialize(reader)
             self.assertILTagEqual(tag, t)
+
+    def test_deserialize(self):
+        f = ILStandardTagFactory()
+        for tag in BASIC_TAG_SAMPLES + [generate_random_tag()] * 10:
+            reader = io.BytesIO()
+            tag.serialize(reader)
+            reader.seek(0)
+            t = f.deserialize(reader)
+            self.assertILTagEqual(tag, t)
+
+        reader = io.BytesIO(b'\x0E12312312312')
+        self.assertRaises(ILTagUnknownError, f.deserialize, reader)
+        reader = io.BytesIO(b'\x0F12312312312')
+        self.assertRaises(ILTagUnknownError, f.deserialize, reader)
+
+    def test_deserialize_strict(self):
+        f = ILStandardTagFactory(True)
+        for tag in BASIC_TAG_SAMPLES:
+            reader = io.BytesIO()
+            tag.serialize(reader)
+            reader.seek(0)
+            t = f.deserialize(reader)
+            self.assertILTagEqual(tag, t)
+
+        reader = io.BytesIO(b'\x0E12312312312')
+        self.assertRaises(ILTagUnknownError, f.deserialize, reader)
+        reader = io.BytesIO(b'\x0F12312312312')
+        self.assertRaises(ILTagUnknownError, f.deserialize, reader)
+
+        reader = io.BytesIO()
+        tag = generate_random_tag(33)
+        tag.serialize(reader)
+        reader.seek(0)
+        self.assertRaises(ILTagUnknownError, f.deserialize, reader)
