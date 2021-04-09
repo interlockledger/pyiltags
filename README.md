@@ -6,6 +6,12 @@
 [InterlockLedger ILTags](https://github.com/interlockledger/specification/tree/master/ILTags)
 TLV encoding.
 
+It implements all tags defined by the standard, each one with proper interfaces to manipulate
+their data. It can also handle any non standard tag as instances of `ILRawTag`.
+
+Furthermore, the provided API allows the implementation of new tags from ground up or by reusing
+one of the existing standard tags with new IDs.
+
 ## Requirements
 
 This program was developed for Python 3.8 or higher (it may work on older versions). No
@@ -27,8 +33,34 @@ $ pip install pyiltags
 
 ## How to use it
 
-The documentation of this library can be found in the source code and in its
-unit-tests.
+This library can be used to create, serialize and deserialize values
+using the **ILTags** standard.
+
+This is a very simple example about how to use this library to
+create, serialize and deserialize a tag:
+
+```python
+from io import BytesIO
+from pyiltags.standard import ILStandardTagFactory, ILUInt64Tag
+
+# Serialize a tag
+tag = ILUInt64Tag(123456)
+writer = BytesIO()
+tag.serialize(writer)
+writer.seek(0)
+serialized = writer.read()
+print(f'Tag with id {tag.id} and value {tag.value} serialized.')
+
+# Unserialize the tag
+reader = BytesIO(serialized)
+factory = ILStandardTagFactory()
+deserialized_tag = factory.deserialize(reader)
+print(
+    f'Deserialized tag with id {deserialized_tag.id} and value {deserialized_tag.value}.')
+```
+
+Further information about this library can be found in the source code and in
+its unit-tests.
 
 ## License
 
