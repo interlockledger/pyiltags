@@ -29,7 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from io import SEEK_END
-from typing import Callable
+from typing import Callable, Type
 import codecs
 import unittest
 import random
@@ -1586,3 +1586,28 @@ class TestILStandardTagFactory(unittest.TestCase, ILTagComparatorMixin):
         tag.serialize(reader)
         reader.seek(0)
         self.assertRaises(ILTagUnknownError, f.deserialize, reader)
+
+    def test_register_custom(self):
+        class Tag1234(ILRawTag):
+            def __init__(self, value: bytes = None) -> None:
+                super().__init__(1234, value)
+
+        f = ILStandardTagFactory()
+
+        f.register_custom(1234, Tag1234)
+        self.assertIsInstance(f.create(1234), Tag1234)
+
+        f.register_custom(12345, lambda: ILInt16Tag(id=12345))
+        t = f.create(12345)
+        self.assertEqual(12345, t.id)
+        self.assertIsInstance(t, ILInt16Tag)
+
+        for id in range(16):
+            self.assertRaises(ValueError, f.register_custom,
+                              id, lambda: ILInt16Tag(id))
+
+        self.assertRaises(TypeError, f.register_custom,
+                          1235, Tag1234)
+
+        self.assertRaises(TypeError, f.register_custom,
+                          1235, lambda x: ILInt16Tag(id=1235))

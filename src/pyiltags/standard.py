@@ -29,7 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import pyilint
-from typing import List
+from typing import Callable, List
 from .base import *
 
 # Standard tag IDs
@@ -881,9 +881,13 @@ class ILStandardTagFactory(ILTagFactory):
         ILTAG_STRDICT_ID: ILStringDictionaryTag
     }
 
+    def __init__(self, strict: bool = False) -> None:
+        super().__init__(strict)
+        self._class_map = ILStandardTagFactory._CLASS_MAP.copy()
+
     def create(self, id: int) -> 'ILTag':
-        if id in ILStandardTagFactory._CLASS_MAP:
-            return ILStandardTagFactory._CLASS_MAP[id]()
+        if id in self._class_map:
+            return self._class_map[id]()
         else:
             return None
 
@@ -917,3 +921,29 @@ class ILStandardTagFactory(ILTagFactory):
         except (ValueError, EOFError):
             raise ILTagCorruptedError(
                 f'Corrupted tag at {tag_offset}.')
+
+    def register_custom(self, id: int, tag_type):
+        """
+        Register a custom class to parse a given tag id. This method is not thread safe.
+
+        Parameters:
+        - `id`: The tag id. It cannot be an id for an implicit tag;
+        - `tag_type`: A function or a class with no parameters that is used to create an empty instance of the tag.
+        """
+        if iltags_is_implicit(id):
+            raise ValueError(
+                'It is not possible to register a custom implicit tag.')
+        else:
+            try:
+                t = tag_type()
+            except TypeError:
+                raise TypeError(
+                    'The function or constructor must work without any parameters.')
+            if isinstance(t, ILTag):
+                if t.id != id:
+                    raise TypeError(
+                        'The function or constructor must return an instance of ILTag.')
+                self._class_map[id] = tag_type
+            else:
+                raise TypeError(
+                    'The function or constructor must return an instance of ILTag.')

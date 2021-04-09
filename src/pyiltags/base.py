@@ -89,6 +89,9 @@ def iltags_is_standard(id: int) -> bool:
 class ILTagFactory:
     """
     This abstract class implements a factory of tags. It is used to serialize classes.
+
+    Instances of `ILTagFactory` are expected to be reused by one or multiple threads
+    at once.
     """
 
     def __init__(self, strict: bool = False) -> None:
@@ -100,7 +103,7 @@ class ILTagFactory:
     def create(self, id: int) -> 'ILTag':
         """
         Creates the appropriate instance of the tags. Returns None if the class
-        is unknown.
+        is unknown. This method is thread safe.
 
         This method must be overriden by subclasses.
         """
@@ -108,7 +111,7 @@ class ILTagFactory:
 
     def deserialize(self, reader: io.IOBase) -> 'ILTag':
         """
-        Deserializes a tag from the reader.
+        Deserializes a tag from the reader. This method is thread safe.
 
         This method must be overriden by subclasses.
         """
