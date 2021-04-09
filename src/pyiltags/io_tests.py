@@ -195,3 +195,43 @@ class TestIO(unittest.TestCase):
                               -(base + 1), size, True, writer)
             self.assertRaises(OverflowError, write_int,
                               base, size, True, writer)
+
+
+class TestLimitedReaderWrapper(unittest.TestCase):
+
+    def sample_bytes(self, count: int) -> bytes:
+        ret = bytearray()
+        for i in range(count):
+            ret.append(i & 0xFF)
+        return bytes(ret)
+
+    def test_constructor(self):
+        reader = io.BytesIO(self.sample_bytes(16))
+        r = LimitedReaderWrapper(reader, 10)
+        self.assertEqual(reader, r.reader)
+        self.assertEqual(10, r.remaining)
+
+    def test_read(self):
+        sample = self.sample_bytes(16)
+
+        reader = io.BytesIO(sample)
+        r = LimitedReaderWrapper(reader, 10)
+        b = r.read()
+        self.assertEqual(sample[:10], b)
+        self.assertEqual(b'', r.read())
+
+        reader = io.BytesIO(sample)
+        r = LimitedReaderWrapper(reader, 10)
+        b = r.read(128)
+        self.assertEqual(sample[:10], b)
+        self.assertEqual(b'', r.read())
+
+        for chunck_size in range(1, 16):
+            r = LimitedReaderWrapper(reader, 10)
+            ret = b''
+            used = 0
+            while used < 10:
+                ret += r.read(chunck_size)
+                used += chunck_size
+            self.assertEqual(0, r.remaining)
+            self.assertEqual(sample[:10], b)

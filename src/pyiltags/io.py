@@ -137,3 +137,29 @@ def write_int(value: int, size: int, signed: bool, writer: io.IOBase):
     the specfied size.
     """
     writer.write(value.to_bytes(size, byteorder='big', signed=signed))
+
+
+class LimitedReaderWrapper:
+    """
+    This class implements a wrapper over an io.IOBase instance that limits
+    the amount of values that can be read from it.
+
+    For now, it implements only the method read() as all other methods are
+    not necessary for this implementation.
+    """
+
+    def __init__(self, reader: io.IOBase, remaining: int) -> None:
+        self.reader = reader
+        self.remaining = remaining
+
+    def read(self, size: int = -1) -> bytes:
+        if self.remaining == 0:
+            return b''
+        else:
+            if size == -1:
+                r = self.remaining
+                self.remaining = 0
+            else:
+                r = min(self.remaining, size)
+                self.remaining -= r
+            return self.reader.read(r)
