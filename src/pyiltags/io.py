@@ -139,18 +139,64 @@ def write_int(value: int, size: int, signed: bool, writer: io.IOBase):
     writer.write(value.to_bytes(size, byteorder='big', signed=signed))
 
 
-class LimitedReaderWrapper:
+class LimitedReaderWrapper(io.IOBase):
     """
     This class implements a wrapper over an io.IOBase instance that limits
     the amount of values that can be read from it.
-
-    For now, it implements only the method read() as all other methods are
-    not necessary for this implementation.
     """
 
-    def __init__(self, reader: io.IOBase, remaining: int) -> None:
+    def __init__(self, reader: io.IOBase, remaining: int, skip_close: bool = True) -> None:
+        """
+        Creates a new instance of this class.
+
+        Parameters:
+        - `reader`: The inner reader to wrap;
+        - `remaining`: The number of bytes remaining;
+        - `skip_close`: If True, closing this instance will not close the inner reader, otherwise,
+          it will do so.
+        """
         self.reader = reader
         self.remaining = remaining
+        self.skip_close = skip_close
+
+    def close(self):
+        """
+        If `skip_close` is set to True, the inner close will not be called otherwise
+        it will call the inner reader close() method.
+        """
+        if not self.skip_close:
+            self.reader.close()
+
+    @property
+    def closed(self) -> bool:
+        """
+        Just a proxy to the inner reader property.
+        """
+        return self.reader.closed
+
+    def flush(self) -> None:
+        """
+        Just a proxy to the inner reader method.
+        """
+        self.reader.flush()
+
+    def isatty(self) -> bool:
+        """
+        Just a proxy to the inner reader method.
+        """
+        return self.reader.isatty()
+
+    def readable(self) -> bool:
+        """
+        Just a proxy to the inner reader method.
+        """
+        return self.reader.readable()
+
+    def tell(self) -> int:
+        """
+        Just a proxy to the inner reader method.
+        """
+        return self.reader.tell()
 
     def read(self, size: int = -1) -> bytes:
         if self.remaining == 0:

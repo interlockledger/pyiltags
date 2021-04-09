@@ -29,6 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import unittest
+from unittest.mock import MagicMock, PropertyMock
 import math
 from .io import *
 
@@ -210,6 +211,51 @@ class TestLimitedReaderWrapper(unittest.TestCase):
         r = LimitedReaderWrapper(reader, 10)
         self.assertEqual(reader, r.reader)
         self.assertEqual(10, r.remaining)
+        self.assertTrue(r.skip_close)
+
+        r = LimitedReaderWrapper(reader, 10, False)
+        self.assertEqual(reader, r.reader)
+        self.assertEqual(10, r.remaining)
+        self.assertFalse(r.skip_close)
+
+    def test_close(self):
+        reader = io.BytesIO()
+        reader.close = MagicMock()
+        r = LimitedReaderWrapper(reader, 10)
+        r.close()
+        reader.close.assert_not_called()
+
+        r = LimitedReaderWrapper(reader, 10, False)
+        r.close()
+        reader.close.assert_called_once()
+
+    def test_closed(self):
+        reader = io.BytesIO()
+        r = LimitedReaderWrapper(reader, 10)
+        self.assertFalse(r.closed)
+        reader.close()
+        self.assertTrue(r.closed)
+
+    def test_flush(self):
+        reader = io.BytesIO()
+        reader.flush = MagicMock()
+        r = LimitedReaderWrapper(reader, 10)
+        r.flush()
+        reader.flush.assert_called_once()
+
+    def test_isatty(self):
+        reader = io.BytesIO()
+        reader.isatty = MagicMock()
+        r = LimitedReaderWrapper(reader, 10)
+        r.isatty()
+        reader.isatty.assert_called_once()
+
+    def test_readable(self):
+        reader = io.BytesIO()
+        reader.readable = MagicMock()
+        r = LimitedReaderWrapper(reader, 10)
+        r.readable()
+        reader.readable.assert_called_once()
 
     def test_read(self):
         sample = self.sample_bytes(16)
