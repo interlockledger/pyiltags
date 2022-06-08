@@ -14,10 +14,9 @@ one of the existing standard tags with new IDs.
 
 ## Requirements
 
-This program was developed for Python 3.8 or higher (it may work on older versions). No
-external dependencies are required.
+This program was developed for Python 3.7 or higher.
 
-It depends on [PyILInt 0.2.0](https://pypi.org/project/pyilint/) or later to work properly.
+It depends on [PyILInt 0.2.2](https://pypi.org/project/pyilint/) or later to work properly.
 
 ## Installation
 
@@ -68,5 +67,7 @@ This program is licensed under the BSD 3-Clause License.
 
 ## Changes
 
-- 0.0.1:
+- 0.1.1:
+    - Tested on multiple versions of python with tox;
+- 0.1.0:
     - Initial public release with minimum functionality;
